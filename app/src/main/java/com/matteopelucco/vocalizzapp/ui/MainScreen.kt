@@ -1,5 +1,6 @@
 package com.matteopelucco.vocalizzapp.ui
 
+import android.content.ClipData
 import android.content.Intent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
@@ -45,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,12 +54,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -67,6 +70,7 @@ import com.matteopelucco.vocalizzapp.ModelCatalog
 import com.matteopelucco.vocalizzapp.R
 import com.matteopelucco.vocalizzapp.UiState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun MainScreen(
@@ -180,7 +184,13 @@ private fun EmptyState() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.size(168.dp))
+        // Con lo schermo basso (orizzontale) il logo e' piu' piccolo, cosi' il testo resta visibile.
+        val compact = LocalConfiguration.current.screenHeightDp < 520
+        Image(
+            painterResource(R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            Modifier.size(if (compact) 72.dp else 168.dp),
+        )
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(R.string.empty_title),
@@ -414,7 +424,9 @@ private fun TypingDots() {
 /** Copia il testo negli appunti; per un attimo conferma con "Copiato". */
 @Composable
 private fun CopyButton(text: String) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val label = stringResource(R.string.app_name)
     var copied by remember(text) { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {
@@ -427,7 +439,7 @@ private fun CopyButton(text: String) {
         label = stringResource(if (copied) R.string.copied else R.string.copy),
         highlighted = copied,
     ) {
-        clipboard.setText(AnnotatedString(text))
+        scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text))) }
         copied = true
     }
 }

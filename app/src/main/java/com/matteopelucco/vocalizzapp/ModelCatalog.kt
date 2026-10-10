@@ -10,10 +10,10 @@ data class ModelFile(val name: String, val sizeBytes: Long)
 data class ModelOption(
     /** Prefisso dei file (`<id>-encoder.int8.onnx`...) e identificativo salvato nelle impostazioni. */
     val id: String,
-    @StringRes val title: Int,
-    @StringRes val tagline: Int,
+    @param:StringRes val title: Int,
+    @param:StringRes val tagline: Int,
     /** Avvertenza facoltativa mostrata sulla scheda. */
-    @StringRes val note: Int? = null,
+    @param:StringRes val note: Int? = null,
     /** Repository su Hugging Face (utente csukuangfj). */
     val repo: String,
     val files: List<ModelFile>,

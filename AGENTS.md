@@ -16,11 +16,12 @@ Non aggiungere funzionalità fuori scopo (no chat, no account, no cloud, no anal
 - **Scelta del modello (decisione utente)**: al primo avvio l'utente sceglie cosa scaricare tra `base` (Veloce, 161 MB), `small` (Equilibrato, 375 MB, consigliato) e `turbo` (Preciso, 1,0 GB); poi può cambiare, scaricarne altri o eliminarli. Il catalogo è in `ModelCatalog.kt` (file, dimensioni esatte, precisione e velocità misurate, RAM minima) e la scheda avvisa se RAM o spazio sono al limite. Per aggiungere un modello: nuova voce nel catalogo + stringhe in `strings.xml` + benchmark in `docs/DESIGN.md`.
 - **Servizio in primo piano**: `TranscriptionService` non fa lavoro, serve solo a evitare che HyperOS rallenti la CPU in background (48 s → 16 s su 44 s di audio). Parte con ogni trascrizione/download.
 - **Privacy**: l'audio non lascia mai il dispositivo. Il permesso INTERNET serve solo per scaricare/aggiornare il modello; mai per inviare audio o testo.
-- minSdk 26, targetSdk/compileSdk 35, package `com.matteopelucco.vocalizzapp`.
+- minSdk 26, **targetSdk/compileSdk 36** (Android 16), package `com.matteopelucco.vocalizzapp`. Strumenti: AGP 8.13.2, Gradle 8.14.6, Kotlin 2.3.21 (le versioni 9.x di AGP/Gradle e Kotlin 2.4 hanno cambiamenti incompatibili: aggiornare solo con un test dedicato).
+- **Distribuzione**: uso personale tramite APK firmato (decisione utente). Niente Google Play: l'app diventerà inutile quando WhatsApp offrirà la trascrizione in italiano. Il percorso di pubblicazione (target API 36, test chiuso con 12 tester per 14 giorni, AAB, privacy policy, dichiarazione del servizio `dataSync` con video) è descritto in `docs/DESIGN.md` §14 per chi volesse riprenderlo.
 
 ## Ambiente di sviluppo (Windows 11)
 - JDK: `C:\Program Files\Java\jdk-21.0.12` (JAVA_HOME). Alternativa: JBR di Android Studio.
-- Android SDK: `%LOCALAPPDATA%\Android\Sdk` (platforms 34/35, build-tools 34/35, platform-tools). `local.properties` (non versionato) deve contenere `sdk.dir`.
+- Android SDK: `%LOCALAPPDATA%\Android\Sdk` (platforms 34/35/36, build-tools 34/35, platform-tools). `local.properties` (non versionato) deve contenere `sdk.dir`.
 - adb: `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe` (non è nel PATH).
 - Shell primaria: PowerShell. Usare `.\gradlew.bat`.
 

@@ -44,14 +44,14 @@ Le istruzioni valgono per **Windows**, **macOS** e **Linux**. I comandi sono dat
 |---|---|---|
 | Git | qualsiasi | per clonare il progetto |
 | JDK | **17 o superiore** (provato con 21) | oppure il JDK incluso in Android Studio |
-| Android SDK | piattaforma **35**, build-tools **35.0.0**, platform-tools | il modo più semplice è installare [Android Studio](https://developer.android.com/studio) |
+| Android SDK | piattaforma **36** (Android 16), build-tools **35.0.0**, platform-tools | il modo più semplice è installare [Android Studio](https://developer.android.com/studio) |
 | Telefono Android | vedi requisiti | con cavo USB |
 
 Senza Android Studio, con i soli strumenti da riga di comando ([cmdline-tools](https://developer.android.com/studio#command-line-tools-only)):
 
 ```bash
 sdkmanager --licenses
-sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 ```
 
 ### 2. Scaricare il progetto
@@ -263,6 +263,7 @@ Altri dettagli, benchmark e decisioni di progetto sono in [docs/DESIGN.md](docs/
 | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | C'è già installata una versione con firma diversa (debug o release). Disinstalla con `adb uninstall com.matteopelucco.vocalizzapp` e riprova. |
 | `adb devices` non mostra il telefono | Controlla il cavo (deve trasferire dati), il Debug USB e di aver accettato la richiesta sul telefono. |
 | `SDK location not found` | Manca `local.properties` o contiene un percorso sbagliato. Usa la barra `/` anche su Windows. |
+| Su Windows Gradle dice "Il file è utilizzato da un altro processo" (di solito durante il lint) | Un vecchio demone Gradle tiene aperto il file. Esegui `.\gradlew.bat --stop`; se non basta, chiudi dal Task Manager il processo Java di un Gradle datato (non quello dell'IDE) e riprova. |
 | Errore sulla versione di Java (`Unsupported class file major version`, "requires Java 17") | Usa un JDK 17 o superiore e imposta `JAVA_HOME`. |
 | L'app mostra un errore di libreria nativa (`dlopen failed`, `UnsatisfiedLinkError`) | Mancano le librerie di sherpa-onnx: esegui lo script `setup-sherpa`, poi ricompila. |
 | Trascrizione molto lenta (tre volte più del solito) | Il telefono ha lo schermo spento o l'app era in secondo piano senza servizio, e Android ha limitato la CPU. Tieni acceso lo schermo; anche il surriscaldamento rallenta. |

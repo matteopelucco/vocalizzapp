@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -87,6 +88,8 @@ fun ModelChooserScreen(
     LaunchedEffect(running?.modelId) { running?.let { selectedId = it.modelId } }
     var pendingDelete by remember { mutableStateOf<ModelOption?>(null) }
     if (!firstRun) BackHandler(onBack = onBack)
+    // Schermo basso (telefono in orizzontale): il pulsante scorre con le schede invece di restare fisso in basso.
+    val compact = LocalConfiguration.current.screenHeightDp < 520
 
     Column(
         Modifier
@@ -141,9 +144,12 @@ fun ModelChooserScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
             )
+            if (compact) {
+                BottomAction(models, selectedId, firstRun, onDownload, onUse, onCancelDownload, compact = true)
+            }
         }
 
-        BottomAction(models, selectedId, firstRun, onDownload, onUse, onCancelDownload)
+        if (!compact) BottomAction(models, selectedId, firstRun, onDownload, onUse, onCancelDownload)
     }
 
     pendingDelete?.let { option ->
@@ -341,6 +347,7 @@ private fun BottomAction(
     onDownload: (String) -> Unit,
     onUse: (String) -> Unit,
     onCancelDownload: () -> Unit,
+    compact: Boolean = false,
 ) {
     val option = ModelCatalog.byId(selectedId) ?: return
     val running = models.download as? DownloadState.Running
@@ -348,8 +355,10 @@ private fun BottomAction(
     val installed = selectedId in models.installed
     val inUse = selectedId == models.active
 
+    // In modalita' compatta il contenitore che scorre ha gia' il padding laterale.
+    val padding = if (compact) Modifier.padding(bottom = 8.dp) else Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp).animateContentSize(),
+        Modifier.fillMaxWidth().then(padding).animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (running != null) {
