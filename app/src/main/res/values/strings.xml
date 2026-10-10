@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">VocalizzApp</string>
+    <string name="empty_hint">Condividi un vocale da WhatsApp con VocalizzApp, oppure scegli un file audio.</string>
+    <string name="audio_received">Vocale ricevuto</string>
+    <string name="audio_name">Nome: %1$s</string>
+    <string name="audio_size">Dimensione: %1$s KB</string>
+    <string name="audio_type">Tipo: %1$s</string>
+    <string name="pick_file">Scegli file audio</string>
+    <string name="decoding">Decodifica in corso…</string>
+    <string name="decoded">Decodificato: %1$s s a 16 kHz, picco %2$s</string>
+    <string name="decode_error">Errore di decodifica: %1$s</string>
 </resources>

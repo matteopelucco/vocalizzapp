@@ -40,8 +40,8 @@ Intent SEND (audio/*)  ──►  MainActivity ──► TranscriptionViewModel
 ## 6. Roadmap
 - [x] F0 Setup: AGENTS.md, DESIGN.md (questo)
 - [x] F1 Scheletro Gradle + Compose, build `assembleDebug`, install sul telefono (hello world)
-- [ ] F2 Intent filter SEND audio/* + schermata di ricezione (mostra nome/durata file)
-- [ ] F3 AudioDecoder: URI → PCM 16 kHz (verificato con vocale WhatsApp reale)
+- [x] F2 Intent filter SEND audio/* + schermata di ricezione (mostra nome/durata file)
+- [x] F3 AudioDecoder: URI → PCM 16 kHz (verificato con vocale WhatsApp reale)
 - [ ] F4 Integrazione sherpa-onnx + modello, trascrizione di file di test
 - [ ] F5 Chunking audio lunghi, progresso, cancellazione
 - [ ] F6 UI finale: copia/condividi, gestione errori, icona
