@@ -12,9 +12,16 @@ import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,35 +43,42 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(Modifier.fillMaxSize()) {
                     val audio by viewModel.audio.collectAsState()
-                    val decode by viewModel.decode.collectAsState()
+                    val state by viewModel.state.collectAsState()
                     val picker = rememberLauncherForActivityResult(
                         ActivityResultContracts.GetContent()
                     ) { uri -> uri?.let(viewModel::onAudioReceived) }
 
                     Column(
-                        Modifier.fillMaxSize().padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                        Modifier.fillMaxSize().statusBarsPadding().padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         val a = audio
-                        if (a == null) {
-                            Text(stringResource(R.string.empty_hint))
-                        } else {
-                            Text(stringResource(R.string.audio_received), style = MaterialTheme.typography.titleMedium)
-                            Text(stringResource(R.string.audio_name, a.name ?: "?"))
-                            Text(stringResource(R.string.audio_size, ((a.sizeBytes ?: 0) / 1024).toString()))
-                            Text(stringResource(R.string.audio_type, a.mimeType ?: "?"))
-                            Text(
-                                when (val d = decode) {
-                                    DecodeState.Idle -> ""
-                                    DecodeState.Decoding -> stringResource(R.string.decoding)
-                                    is DecodeState.Done -> stringResource(
-                                        R.string.decoded, "%.1f".format(d.seconds), "%.2f".format(d.peak)
-                                    )
-                                    is DecodeState.Error -> stringResource(R.string.decode_error, d.message)
+                        Text(
+                            a?.name ?: stringResource(R.string.empty_hint),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        when (val s = state) {
+                            UiState.Idle -> {}
+                            UiState.Decoding -> Text(stringResource(R.string.decoding))
+                            is UiState.Transcribing -> {
+                                Text(stringResource(R.string.transcribing))
+                                LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.fillMaxWidth())
+                            }
+                            is UiState.ModelMissing -> Text(stringResource(R.string.model_missing, s.path, s.found))
+                            is UiState.Error -> Text(stringResource(R.string.error, s.message))
+                            is UiState.Done -> {
+                                Text(
+                                    stringResource(
+                                        R.string.done_stats, "%.1f".format(s.audioSeconds), "%.1f".format(s.elapsedSeconds)
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                                SelectionContainer(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                                    Text(s.text.ifBlank { stringResource(R.string.no_speech) })
                                 }
-                            )
+                            }
                         }
+                        Spacer(Modifier.weight(if (state is UiState.Done) 0.0001f else 1f))
                         Button(onClick = { picker.launch("audio/*") }) {
                             Text(stringResource(R.string.pick_file))
                         }
@@ -87,6 +101,7 @@ class MainActivity : ComponentActivity() {
         } else {
             @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM)
         }
-        uri?.let(viewModel::onAudioReceived)
+        // L'extra "model" serve solo per i test da adb: sceglie il modello Whisper da usare.
+        uri?.let { viewModel.onAudioReceived(it, intent.getStringExtra("model")) }
     }
 }

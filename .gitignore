@@ -10,3 +10,6 @@
 *.jks
 *.keystore
 app/build/
+
+# Librerie native sherpa-onnx (scaricate da scripts/setup-sherpa.ps1)
+app/src/main/jniLibs/

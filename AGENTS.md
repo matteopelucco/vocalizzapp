@@ -12,7 +12,8 @@ Non aggiungere funzionalità fuori scopo (no chat, no account, no cloud, no anal
 - **Trascrizione**: on-device, offline, via **sherpa-onnx** (librerie native precompilate, niente NDK) con modello **Whisper multilingua** int8.
 - **Input**: l'app è destinataria di `ACTION_SEND` / `ACTION_SEND_MULTIPLE` con `audio/*` (Condividi da WhatsApp) + pulsante "scegli file".
 - **Decodifica audio**: `MediaExtractor` + `MediaCodec` (Opus/OGG, m4a, mp3...) → PCM 16 kHz mono float. Nessun ffmpeg.
-- **Privacy**: l'audio non lascia mai il dispositivo. Nessun permesso INTERNET a runtime (se serve per scaricare il modello, farlo solo al primo avvio e dichiararlo chiaramente; preferibile includere il modello negli assets).
+- **Modello esternalizzato (decisione utente)**: il modello Whisper NON va nell'APK, così può essere aggiornato/sostituito senza reinstallare l'app. Vive in `getExternalFilesDir("models")/<nome-modello>/` (`*-encoder.int8.onnx`, `*-decoder.int8.onnx`, `*-tokens.txt`). `ModelManager` lo individua a runtime; se manca, l'app lo dice e propone il download (da Hugging Face `csukuangfj/sherpa-onnx-whisper-*`). In sviluppo: `adb push` nella stessa cartella.
+- **Privacy**: l'audio non lascia mai il dispositivo. Il permesso INTERNET serve solo per scaricare/aggiornare il modello; mai per inviare audio o testo.
 - minSdk 26, targetSdk/compileSdk 35, package `com.matteopelucco.vocalizzapp`.
 
 ## Ambiente di sviluppo (Windows 11)
