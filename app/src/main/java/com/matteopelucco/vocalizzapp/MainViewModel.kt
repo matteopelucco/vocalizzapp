@@ -145,7 +145,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val t3 = SystemClock.elapsedRealtime()
                 Log.i(TAG, "model=${model.name} audio=${audioSeconds}s decode=${t1 - t0}ms load=${t2 - t1}ms transcribe=${t3 - t2}ms")
-                Log.i(TAG, "text[${model.name}]: $text")
                 _state.value = UiState.Done(text, audioSeconds, (t3 - t1) / 1000f)
             } catch (e: CancellationException) {
                 throw e

@@ -1,0 +1,10 @@
+# Fine riga coerenti su tutti i sistemi: gli script di shell e il wrapper Gradle devono restare LF.
+gradlew       text eol=lf
+*.sh          text eol=lf
+*.bat         text eol=crlf
+*.ps1         text eol=crlf
+
+# File binari
+*.png         binary
+*.jar         binary
+*.so          binary
