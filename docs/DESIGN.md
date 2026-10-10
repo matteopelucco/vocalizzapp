@@ -73,3 +73,11 @@ Su HyperOS/MIUI (POCO) serve anche **Installa via USB** (Opzioni sviluppatore), 
 - Test senza WhatsApp: `adb push test.opus .../files/test.opus` (con push, non cp), poi
   `adb shell am start -a android.intent.action.SEND -t audio/ogg --eu android.intent.extra.STREAM file:///sdcard/Android/data/com.matteopelucco.vocalizzapp/files/test.opus --es model small -n com.matteopelucco.vocalizzapp/.MainActivity`
   e leggere i tempi con `adb logcat -d -s VocalizzApp:I`.
+
+## 10. Stile UI
+- Tema in `ui/Theme.kt` (palette dal logo: blu #1659F0 + accenti ciano; chiaro e scuro, segue il sistema), schermata in `ui/MainScreen.kt`. `MainActivity` si limita a collegare ViewModel e UI.
+- Linee guida: minimalismo, card bianche con bordo sottile e angoli 24 dp, testo trascritto a 17 sp con interlinea ampia, un solo pulsante principale a larghezza piena (Scegli file / Annulla).
+
+## 11. Prestazioni in background (importante)
+Con schermo bloccato o app non in primo piano HyperOS limita la CPU: lo stesso vocale da 44 s con `small` passa da ~17 s (schermo acceso) a ~48 s. Se l'utente condivide un vocale e poi torna a WhatsApp, la trascrizione rallenta o puo' essere sospesa.
+Possibile soluzione (da valutare in F6): servizio in primo piano (`FOREGROUND_SERVICE_DATA_SYNC` + notifica) per le trascrizioni lunghe; oppure semplicemente avvisare l'utente di restare nell'app.

@@ -1,4 +1,4 @@
-﻿package com.matteopelucco.vocalizzapp
+package com.matteopelucco.vocalizzapp
 
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
@@ -8,6 +8,8 @@ import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Trascrive PCM 16 kHz mono con Whisper (sherpa-onnx). Va chiuso con [close]. */
@@ -32,33 +34,45 @@ class Transcriber(model: WhisperModel, language: String = "it") : AutoCloseable 
         ),
     )
 
-    /** [onProgress] riceve una frazione 0..1 dopo ogni blocco. */
-    suspend fun transcribe(pcm: FloatArray, onProgress: (Float) -> Unit = {}): String =
-        withContext(Dispatchers.Default) {
-            val chunkSize = CHUNK_SECONDS * AudioDecoder.TARGET_RATE
-            val parts = mutableListOf<String>()
-            var start = 0
-            while (start < pcm.size) {
-                coroutineContext.ensureActive()
-                val end = minOf(start + chunkSize, pcm.size)
-                val stream = recognizer.createStream()
-                try {
-                    stream.acceptWaveform(pcm.copyOfRange(start, end), AudioDecoder.TARGET_RATE)
-                    recognizer.decode(stream)
-                    val text = recognizer.getResult(stream).text.trim()
-                    if (text.isNotEmpty()) parts += text
-                } finally {
-                    stream.release()
+    // Il recognizer nativo non e' pensato per usi concorrenti (es. un annullamento seguito da un nuovo audio).
+    private val lock = Mutex()
+
+    /**
+     * Trascrive blocco per blocco; dopo ognuno chiama [onProgress] con la frazione completata (0..1)
+     * e il testo ottenuto finora. L'annullamento ha effetto al termine del blocco in corso.
+     */
+    suspend fun transcribe(pcm: FloatArray, onProgress: (Float, String) -> Unit = { _, _ -> }): String =
+        lock.withLock {
+            withContext(Dispatchers.Default) {
+                val parts = mutableListOf<String>()
+                for ((start, end) in AudioChunker.split(pcm)) {
+                    coroutineContext.ensureActive()
+                    if (!AudioChunker.isSilent(pcm, start, end)) {
+                        val stream = recognizer.createStream()
+                        try {
+                            stream.acceptWaveform(pcm.copyOfRange(start, end), AudioDecoder.TARGET_RATE)
+                            recognizer.decode(stream)
+                            val text = recognizer.getResult(stream).text.trim()
+                            if (text.isNotEmpty()) parts += continueSentence(parts.lastOrNull(), text)
+                        } finally {
+                            stream.release()
+                        }
+                    }
+                    onProgress(end / pcm.size.toFloat(), parts.joinToString(" "))
                 }
-                start = end
-                onProgress(start / pcm.size.toFloat())
+                parts.joinToString(" ")
             }
-            parts.joinToString(" ")
         }
 
     override fun close() = recognizer.release()
 
-    private companion object {
-        const val CHUNK_SECONDS = 28 // Whisper accetta al massimo 30 s per volta
+    internal companion object {
+        /** Whisper inizia ogni blocco in minuscolo: dopo un punto fermo la prima lettera va maiuscola. */
+        fun continueSentence(previous: String?, text: String): String =
+            if (previous != null && previous.last() in ".!?" && text.first().isLowerCase()) {
+                text.replaceFirstChar { it.uppercase() }
+            } else {
+                text
+            }
     }
 }

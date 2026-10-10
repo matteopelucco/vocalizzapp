@@ -1,11 +1,17 @@
 <resources>
     <string name="app_name">VocalizzApp</string>
-    <string name="empty_hint">Condividi un vocale da WhatsApp con VocalizzApp, oppure scegli un file audio.</string>
+    <string name="empty_title">Leggi, non ascoltare</string>
+    <string name="empty_subtitle">Condividi un vocale da WhatsApp con VocalizzApp e ottieni subito il testo, direttamente sul tuo telefono.</string>
     <string name="pick_file">Scegli file audio</string>
-    <string name="decoding">Lettura dell\'audio…</string>
-    <string name="transcribing">Trascrizione in corso…</string>
-    <string name="done_stats">Audio %1$s s, trascritto in %2$s s</string>
-    <string name="no_speech">(nessun parlato riconosciuto)</string>
+    <string name="cancel">Annulla</string>
+    <string name="audio_generic">Vocale</string>
+    <string name="status_decoding">Lettura dell\'audio…</string>
+    <string name="status_transcribing">Trascrizione in corso · %1$d%%</string>
+    <string name="status_done">%1$d s di audio · trascritto in %2$d s</string>
+    <string name="status_cancelled">Interrotta</string>
+    <string name="placeholder">Il testo comparirà qui man mano che viene trascritto.</string>
+    <string name="cancelled">Nessun testo ottenuto prima dell\'interruzione.</string>
+    <string name="no_speech">Nessun parlato riconosciuto.</string>
     <string name="model_missing">Modello Whisper non trovato.\nCopia i file del modello in:\n%1$s/NOME-MODELLO/\n\nL\'app vede: %2$s</string>
     <string name="error">Errore: %1$s</string>
 </resources>

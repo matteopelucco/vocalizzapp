@@ -9,17 +9,18 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface UiState {
     data object Idle : UiState
     data object Decoding : UiState
-    data class Transcribing(val progress: Float) : UiState
+    data class Transcribing(val progress: Float, val partialText: String) : UiState
     data class Done(val text: String, val audioSeconds: Float, val elapsedSeconds: Float) : UiState
+    data class Cancelled(val partialText: String) : UiState
     data class ModelMissing(val path: String, val found: String) : UiState
     data class Error(val message: String) : UiState
 }
@@ -46,6 +47,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         transcriber = null
     }
 
+    /** Interrompe la trascrizione in corso, mantenendo il testo parziale gia' ottenuto. */
+    fun cancel() {
+        val current = _state.value
+        if (current is UiState.Decoding || current is UiState.Transcribing) {
+            job?.cancel()
+            _state.value = UiState.Cancelled((current as? UiState.Transcribing)?.partialText.orEmpty())
+        }
+    }
+
     /** [modelName]: modello da usare (default: il primo disponibile). */
     fun onAudioReceived(uri: Uri, modelName: String? = null) {
         _audio.value = readAudioInfo(getApplication(), uri)
@@ -63,7 +73,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val audioSeconds = pcm.size / AudioDecoder.TARGET_RATE.toFloat()
                 val t1 = SystemClock.elapsedRealtime()
 
-                _state.value = UiState.Transcribing(0f)
+                _state.value = UiState.Transcribing(0f, "")
                 if (transcriberModel != model.name) {
                     transcriber?.close()
                     transcriber = null
@@ -72,7 +82,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val transcriber = transcriber!!
                 val t2 = SystemClock.elapsedRealtime()
-                val text = transcriber.transcribe(pcm) { _state.value = UiState.Transcribing(it) }
+                val text = transcriber.transcribe(pcm) { progress, partial ->
+                    _state.value = UiState.Transcribing(progress, partial)
+                }
                 val t3 = SystemClock.elapsedRealtime()
                 Log.i(TAG, "model=${model.name} audio=${audioSeconds}s decode=${t1 - t0}ms load=${t2 - t1}ms transcribe=${t3 - t2}ms")
                 Log.i(TAG, "text[${model.name}]: $text")
