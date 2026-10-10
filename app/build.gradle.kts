@@ -1,3 +1,5 @@
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Properties
 
 // Credenziali di firma release: in keystore.properties (non versionato), la chiave sta fuori dal repo.
@@ -5,6 +7,28 @@ val keystoreProps = Properties().apply {
     val file = rootProject.file("keystore.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
+
+// Versione: major.minor.patch + numero di build, da version.properties (vedi il file).
+// Una build che firma l'APK usa i valori correnti e poi aumenta patch e code per la firma successiva.
+val versionFile = rootProject.file("version.properties")
+val versionProps = Properties().apply { versionFile.inputStream().use { load(it) } }
+val vMajor = versionProps.getProperty("major").toInt()
+val vMinor = versionProps.getProperty("minor").toInt()
+val vPatch = versionProps.getProperty("patch").toInt()
+val vCode = versionProps.getProperty("code").toInt()
+val isSigningBuild = gradle.startParameter.taskNames.any {
+    Regex("(assemble|bundle|install|package)Release$").containsMatchIn(it)
+}
+if (isSigningBuild) {
+    versionFile.writeText(
+        "# Versione del PROSSIMO APK firmato (assembleRelease / bundleRelease / installRelease).\n" +
+            "# A ogni firma \"patch\" e \"code\" salgono di 1 in automatico: dopo la firma committare questo file.\n" +
+            "# \"major\" e \"minor\" si cambiano a mano, solo su richiesta dell'utente.\n" +
+            "major=$vMajor\nminor=$vMinor\npatch=${vPatch + 1}\ncode=${vCode + 1}\n"
+    )
+}
+// Data e ora della build, mostrate all'utente accanto alla versione.
+val buildStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
 
 plugins {
     alias(libs.plugins.android.application)
@@ -20,8 +44,9 @@ android {
         applicationId = "com.matteopelucco.vocalizzapp"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = vCode
+        versionName = "$vMajor.$vMinor.$vPatch"
+        buildConfigField("String", "BUILD_STAMP", "\"$buildStamp\"")
         ndk {
             abiFilters += "arm64-v8a"
         }
@@ -39,6 +64,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Distingue a colpo d'occhio una build di sviluppo da una firmata con lo stesso numero.
+            versionNameSuffix = "-dev"
+        }
         release {
             // Niente R8: le classi JNI di sherpa-onnx vanno trovate per nome dal codice nativo.
             isMinifyEnabled = false
@@ -51,6 +80,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

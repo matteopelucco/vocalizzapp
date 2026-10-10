@@ -174,6 +174,8 @@ keyPassword=LA_TUA_PASSWORD
 
 L'APK firmato è in `app/build/outputs/apk/release/app-release.apk`. Se `keystore.properties` non esiste, la release viene compilata ma **non firmata**: il file si chiama `app-release-unsigned.apk` e Android non lo installa.
 
+**Versione.** In basso nella schermata iniziale l'app mostra la versione, per esempio `Versione 0.1.0 (20261010_222537)`: numero di versione e, tra parentesi, data e ora della build (`aaaammgg_hhmmss`). Il numero sta in `version.properties` (versione del *prossimo* APK firmato): a ogni `assembleRelease` il programma usa quei valori e poi aumenta da solo `patch` e `code`, quindi dopo ogni firma conviene committare quel file. `major` e `minor` si cambiano a mano. Le build di sviluppo (`installDebug`) mostrano lo stesso numero con il suffisso `-dev` e non lo modificano.
+
 **d) Installa:**
 
 ```bash

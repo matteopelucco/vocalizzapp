@@ -66,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.matteopelucco.vocalizzapp.AudioInfo
+import com.matteopelucco.vocalizzapp.BuildConfig
 import com.matteopelucco.vocalizzapp.ModelCatalog
 import com.matteopelucco.vocalizzapp.R
 import com.matteopelucco.vocalizzapp.UiState
@@ -137,7 +138,17 @@ private fun HomeScreen(
                 if (empty) EmptyState() else Content(audio, state)
             }
         }
-        Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                stringResource(R.string.version, BuildConfig.VERSION_NAME, BuildConfig.BUILD_STAMP),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (working) {
                 OutlinedButton(
                     onClick = onCancel,

@@ -39,7 +39,7 @@ Non aggiungere funzionalità fuori scopo (no chat, no account, no cloud, no anal
 - La chiave sta **fuori dal repo**: `%USERPROFILE%\.vocalizzapp-keys\vocalizzapp-release.jks`; i riferimenti sono in `keystore.properties` (radice del progetto, ignorato da git). **Mai committarli né stamparne le password.** Senza la chiave l'app non si può più aggiornare, solo reinstallare: ricordare all'utente di tenerne un backup.
 - Una release ha firma diversa dalla debug: per passare dall'una all'altra serve `adb uninstall` (si perde il modello scaricato, che l'app riscarica da sola).
 - Su HyperOS l'installazione via USB richiede **telefono sbloccato e schermo acceso** e un tocco su "Installa"; se è bloccato fallisce con `INSTALL_FAILED_USER_RESTRICTED`. In alternativa: `adb push app-release.apk /sdcard/Download/` e installarlo dal telefono.
-- Versione in `app/build.gradle.kts` (`versionCode`/`versionName`): incrementare a ogni release.
+- **Versione (decisione utente)**: l'app mostra "Versione `major.minor.patch` (`aaaammgg_hhmmss`)" sopra il pulsante "Scegli file audio"; la data e l'ora sono quelle della build. I numeri stanno in `version.properties` (radice del progetto) e indicano la versione del **prossimo** APK firmato. A ogni firma (`assembleRelease`/`bundleRelease`/`installRelease`) la build usa i valori correnti e poi aumenta da sola `patch` e `code`: dopo ogni firma **committare `version.properties`**. `major` e `minor` si cambiano a mano e **solo su richiesta dell'utente** (mai da soli). Le build di sviluppo mostrano la stessa versione con il suffisso `-dev` e non toccano il file. Prima versione firmata: 0.1.0.
 
 ## Struttura
 ```
