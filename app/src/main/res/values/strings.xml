@@ -4,6 +4,8 @@
     <string name="empty_subtitle">Condividi un vocale da WhatsApp con VocalizzApp e ottieni subito il testo, direttamente sul tuo telefono.</string>
     <string name="pick_file">Scegli file audio</string>
     <string name="cancel">Annulla</string>
+    <string name="copy">Copia</string>
+    <string name="copied">Copiato</string>
     <string name="audio_generic">Vocale</string>
     <string name="status_decoding">Lettura dell\'audio…</string>
     <string name="status_transcribing">Trascrizione in corso · %1$d%%</string>

@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,25 +26,34 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.matteopelucco.vocalizzapp.AudioInfo
 import com.matteopelucco.vocalizzapp.R
 import com.matteopelucco.vocalizzapp.UiState
+import kotlinx.coroutines.delay
 
 @Composable
 fun MainScreen(
@@ -242,19 +252,56 @@ private fun TranscriptCard(text: String, placeholder: String) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Box(Modifier.padding(horizontal = 20.dp, vertical = 18.dp).animateContentSize()) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp).animateContentSize()) {
             if (text.isBlank()) {
                 Text(
                     placeholder,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 2.dp),
                 )
             } else {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { CopyButton(text) }
+                Spacer(Modifier.height(8.dp))
                 SelectionContainer {
                     Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
+    }
+}
+
+/** Copia il testo negli appunti; per un attimo conferma con "Copiato". */
+@Composable
+private fun CopyButton(text: String) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember(text) { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(2000)
+            copied = false
+        }
+    }
+    val container = if (copied) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val content = if (copied) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(container)
+            .clickable(role = Role.Button) {
+                clipboard.setText(AnnotatedString(text))
+                copied = true
+            }
+            .padding(start = 12.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(if (copied) CheckIcon else CopyIcon, contentDescription = null, Modifier.size(18.dp), tint = content)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            stringResource(if (copied) R.string.copied else R.string.copy),
+            style = MaterialTheme.typography.labelMedium,
+            color = content,
+        )
     }
 }
 
