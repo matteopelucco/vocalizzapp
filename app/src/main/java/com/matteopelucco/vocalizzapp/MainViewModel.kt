@@ -43,6 +43,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var transcriberModel: String? = null
 
     override fun onCleared() {
+        // Un servizio ancora attivo viene fermato dal "finally" del lavoro; qui basta liberare il modello.
         transcriber?.close()
         transcriber = null
     }
@@ -56,17 +57,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** [modelName]: modello da usare (default: il primo disponibile). */
+    // Lavori attivi (compreso uno annullato che sta finendo il blocco in corso): il servizio resta finche' > 0.
+    private var activeJobs = 0
+
+    /** [modelName]: modello da usare (default: `small`, vedi [ModelManager.DEFAULT_MODEL]). */
     fun onAudioReceived(uri: Uri, modelName: String? = null) {
         _audio.value = readAudioInfo(getApplication(), uri)
         job?.cancel()
         job = viewModelScope.launch {
+            var serviceStarted = false
             try {
                 val model = modelManager.findModel(modelName)
                 if (model == null) {
                     _state.value = UiState.ModelMissing(modelManager.modelsDir.absolutePath, modelManager.describe())
                     return@launch
                 }
+                // Il servizio in primo piano evita che Android rallenti la CPU se l'utente lascia l'app.
+                TranscriptionService.start(getApplication())
+                activeJobs++
+                serviceStarted = true
                 _state.value = UiState.Decoding
                 val t0 = SystemClock.elapsedRealtime()
                 val pcm = AudioDecoder.decode(getApplication(), uri)
@@ -93,6 +102,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Throwable) {
                 _state.value = UiState.Error(e.message ?: e.javaClass.simpleName)
+            } finally {
+                if (serviceStarted && --activeJobs == 0) TranscriptionService.stop(getApplication())
             }
         }
     }

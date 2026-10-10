@@ -43,28 +43,60 @@ class Transcriber(model: WhisperModel, language: String = "it") : AutoCloseable 
      */
     suspend fun transcribe(pcm: FloatArray, onProgress: (Float, String) -> Unit = { _, _ -> }): String =
         lock.withLock {
-            withContext(Dispatchers.Default) {
-                val parts = mutableListOf<String>()
-                for ((start, end) in AudioChunker.split(pcm)) {
-                    coroutineContext.ensureActive()
-                    if (!AudioChunker.isSilent(pcm, start, end)) {
-                        val stream = recognizer.createStream()
-                        try {
-                            stream.acceptWaveform(pcm.copyOfRange(start, end), AudioDecoder.TARGET_RATE)
-                            recognizer.decode(stream)
-                            val text = recognizer.getResult(stream).text.trim()
-                            if (text.isNotEmpty()) parts += continueSentence(parts.lastOrNull(), text)
-                        } finally {
-                            stream.release()
-                        }
-                    }
-                    onProgress(end / pcm.size.toFloat(), parts.joinToString(" "))
-                }
-                parts.joinToString(" ")
+            try {
+                check(!released) { "Transcriber chiuso" }
+                run(pcm, onProgress)
+            } finally {
+                // Un close() arrivato mentre lavoravamo ha rimandato il rilascio a questo punto.
+                if (closeRequested) releaseNow()
             }
         }
 
-    override fun close() = recognizer.release()
+    private suspend fun run(pcm: FloatArray, onProgress: (Float, String) -> Unit): String =
+        withContext(Dispatchers.Default) {
+            val parts = mutableListOf<String>()
+            for ((start, end) in AudioChunker.split(pcm)) {
+                coroutineContext.ensureActive()
+                if (!AudioChunker.isSilent(pcm, start, end)) {
+                    val stream = recognizer.createStream()
+                    try {
+                        stream.acceptWaveform(pcm.copyOfRange(start, end), AudioDecoder.TARGET_RATE)
+                        recognizer.decode(stream)
+                        val text = recognizer.getResult(stream).text.trim()
+                        if (text.isNotEmpty()) parts += continueSentence(parts.lastOrNull(), text)
+                    } finally {
+                        stream.release()
+                    }
+                }
+                onProgress(end / pcm.size.toFloat(), parts.joinToString(" "))
+            }
+            parts.joinToString(" ")
+        }
+
+    @Volatile private var closeRequested = false
+    private var released = false
+
+    /**
+     * Libera il modello. Se e' in uso (blocco in corso), il rilascio avviene appena finisce:
+     * liberarlo mentre il codice nativo lavora farebbe crashare l'app.
+     */
+    override fun close() {
+        closeRequested = true
+        if (lock.tryLock()) {
+            try {
+                releaseNow()
+            } finally {
+                lock.unlock()
+            }
+        }
+    }
+
+    private fun releaseNow() {
+        if (!released) {
+            released = true
+            recognizer.release()
+        }
+    }
 
     internal companion object {
         /** Whisper inizia ogni blocco in minuscolo: dopo un punto fermo la prima lettera va maiuscola. */

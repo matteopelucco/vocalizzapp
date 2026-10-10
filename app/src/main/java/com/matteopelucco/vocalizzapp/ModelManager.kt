@@ -52,10 +52,16 @@ class ModelManager(context: Context) {
         }.distinctBy { it.name }.sortedBy { it.name }
     }
 
-    /** Il modello chiamato [name], oppure il primo disponibile. */
+    /** Il modello chiamato [name], altrimenti [DEFAULT_MODEL], altrimenti il primo disponibile. */
     fun findModel(name: String? = null): WhisperModel? {
         val models = findModels()
-        return models.firstOrNull { it.name == name } ?: models.firstOrNull()
+        return models.firstOrNull { it.name == name }
+            ?: models.firstOrNull { it.name == DEFAULT_MODEL }
+            ?: models.firstOrNull()
+    }
+
+    companion object {
+        const val DEFAULT_MODEL = "small"
     }
 
     // Preferisce la variante int8 (piu' piccola e veloce).
