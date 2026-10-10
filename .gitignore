@@ -13,3 +13,6 @@ app/build/
 
 # Librerie native sherpa-onnx (scaricate da scripts/setup-sherpa.ps1)
 app/src/main/jniLibs/
+
+# Credenziali di firma release (la chiave sta fuori dal repo)
+keystore.properties

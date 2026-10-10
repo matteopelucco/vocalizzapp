@@ -1,6 +1,7 @@
 package com.matteopelucco.vocalizzapp
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -28,6 +29,8 @@ class MainActivity : ComponentActivity() {
             VocalizzAppTheme {
                 val audio by viewModel.audio.collectAsState()
                 val state by viewModel.state.collectAsState()
+                val modelReady by viewModel.modelReady.collectAsState()
+                val download by viewModel.download.collectAsState()
                 val picker = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent()
                 ) { uri -> uri?.let(viewModel::onAudioReceived) }
@@ -35,8 +38,12 @@ class MainActivity : ComponentActivity() {
                 MainScreen(
                     audio = audio,
                     state = state,
+                    modelReady = modelReady,
+                    download = download,
                     onPickFile = { picker.launch("audio/*") },
                     onCancel = viewModel::cancel,
+                    onDownloadModel = viewModel::downloadModel,
+                    onCancelDownload = viewModel::cancelDownload,
                 )
             }
         }
@@ -49,7 +56,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent) {
-        if (intent.action != Intent.ACTION_SEND) return
+        // Solo build di sviluppo: avvia il download del modello da adb (`--ez download true`).
+        val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val startDownload = debuggable && intent.getBooleanExtra("download", false)
+        if (intent.action != Intent.ACTION_SEND) {
+            if (startDownload) viewModel.downloadModel()
+            return
+        }
         val uri: Uri? = if (Build.VERSION.SDK_INT >= 33) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         } else {
@@ -57,5 +70,6 @@ class MainActivity : ComponentActivity() {
         }
         // L'extra "model" serve solo per i test da adb: sceglie il modello Whisper da usare.
         uri?.let { viewModel.onAudioReceived(it, intent.getStringExtra("model")) }
+        if (startDownload) viewModel.downloadModel()
     }
 }

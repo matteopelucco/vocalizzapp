@@ -6,7 +6,7 @@
     <string name="cancel">Annulla</string>
     <string name="share">Condividi</string>
     <string name="notification_channel">Trascrizione in corso</string>
-    <string name="notification_text">Sto trascrivendo il vocale…</string>
+    <string name="notification_text">Sto lavorando per te…</string>
     <string name="copy">Copia</string>
     <string name="copied">Copiato</string>
     <string name="audio_generic">Vocale</string>
@@ -18,6 +18,11 @@
     <string name="placeholder">Il testo comparirà qui man mano che viene trascritto.</string>
     <string name="cancelled">Nessun testo ottenuto prima dell\'interruzione.</string>
     <string name="no_speech">Nessun parlato riconosciuto.</string>
-    <string name="model_missing">Modello Whisper non trovato.\nCopia i file del modello in:\n%1$s/NOME-MODELLO/\n\nL\'app vede: %2$s</string>
+    <string name="model_title">Serve il modello di trascrizione</string>
+    <string name="model_body">Un download una tantum di circa %1$d MB, meglio con il Wi-Fi. Poi tutto funziona offline, direttamente sul telefono: i tuoi vocali non lasciano mai il dispositivo.</string>
+    <string name="model_download">Scarica il modello</string>
+    <string name="model_downloading">Download in corso · %1$d%%</string>
+    <string name="model_failed">Download interrotto: %1$s</string>
+    <string name="retry">Riprova</string>
     <string name="error">Errore: %1$s</string>
 </resources>

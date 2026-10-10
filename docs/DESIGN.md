@@ -33,7 +33,7 @@ Intent SEND (audio/*)  ──►  MainActivity ──► TranscriptionViewModel
 | Lingua | Auto-detect, default `it` selezionabile | I vocali sono per lo più italiani |
 
 ## 5. Rischi
-- Dimensione modello: `small` int8 ≈ 375 MB (encoder 112 + decoder 262), `base` int8 molto meno. **Decisione: il modello è esterno all'APK** (aggiornabile senza reinstallare). Cartella: `getExternalFilesDir("models")/<nome>/`. Dev: `adb push`; release: download in-app da Hugging Face (permesso INTERNET solo per questo) — da implementare in F6/F7. L'APK resta piccolo (~50 MB, per le librerie native sherpa-onnx).
+- Dimensione modello: `small` int8 ≈ 375 MB (encoder 112 + decoder 262), `base` int8 molto meno. **Decisione: il modello è esterno all'APK** (aggiornabile senza reinstallare). Cartella: `getExternalFilesDir("models")/<nome>/`. Download in-app da Hugging Face (permesso INTERNET solo per questo), implementato; in sviluppo anche `adb push`. L'APK resta piccolo (~50 MB, per le librerie native sherpa-onnx).
 - Velocità: su telefoni medi `small` può essere più lento del tempo reale → mostrare progresso, eseguire in foreground service se > ~1 min.
 - Memoria: decodificare in streaming/chunk per vocali lunghi.
 
@@ -43,9 +43,9 @@ Intent SEND (audio/*)  ──►  MainActivity ──► TranscriptionViewModel
 - [x] F2 Intent filter SEND audio/* + schermata di ricezione (mostra nome/durata file)
 - [x] F3 AudioDecoder: URI → PCM 16 kHz (verificato con vocale WhatsApp reale)
 - [x] F4 Integrazione sherpa-onnx + modello, trascrizione di file di test (vedi benchmark in sez. 8)
-- [ ] F5 Chunking audio lunghi, progresso, cancellazione
-- [ ] F6 UI finale: copia/condividi, gestione errori, icona
-- [ ] F7 APK release firmato per uso personale + installazione definitiva
+- [x] F5 Chunking audio lunghi, progresso, cancellazione
+- [x] F6 UI finale: copia, condividi, animazioni, download del modello in-app, servizio in primo piano, gestione errori, icona
+- [x] F7 APK release firmato (v1.0) installato sul POCO X6 Pro
 
 ## 7. Preparazione dispositivo Android
 1. Impostazioni → Info telefono → tocca 7 volte "Numero build" → abilita Opzioni sviluppatore.

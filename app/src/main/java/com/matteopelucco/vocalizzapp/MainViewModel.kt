@@ -21,7 +21,7 @@ sealed interface UiState {
     data class Transcribing(val progress: Float, val partialText: String) : UiState
     data class Done(val text: String, val audioSeconds: Float, val elapsedSeconds: Float) : UiState
     data class Cancelled(val partialText: String) : UiState
-    data class ModelMissing(val path: String, val found: String) : UiState
+    data object ModelMissing : UiState
     data class Error(val message: String) : UiState
 }
 
@@ -36,16 +36,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow<UiState>(UiState.Idle)
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    private val _modelReady = MutableStateFlow(modelManager.findModel() != null)
+    val modelReady: StateFlow<Boolean> = _modelReady.asStateFlow()
+
+    private val _download = MutableStateFlow<DownloadState>(DownloadState.Idle)
+    val download: StateFlow<DownloadState> = _download.asStateFlow()
+
     private var job: Job? = null
+    private var downloadJob: Job? = null
+
+    // Audio arrivato quando il modello mancava: parte da solo appena il download finisce.
+    private var pendingUri: Uri? = null
 
     // Il caricamento del modello e' costoso: lo teniamo in memoria tra un vocale e l'altro.
     private var transcriber: Transcriber? = null
     private var transcriberModel: String? = null
 
+    // Lavori attivi (compreso uno annullato che sta finendo il blocco in corso): il servizio resta finche' > 0.
+    private var activeJobs = 0
+
     override fun onCleared() {
         // Un servizio ancora attivo viene fermato dal "finally" del lavoro; qui basta liberare il modello.
         transcriber?.close()
         transcriber = null
+    }
+
+    /** Il servizio in primo piano evita che Android rallenti la CPU se l'utente lascia l'app. */
+    private fun serviceStarted() {
+        TranscriptionService.start(getApplication())
+        activeJobs++
+    }
+
+    private fun serviceFinished() {
+        if (--activeJobs == 0) TranscriptionService.stop(getApplication())
     }
 
     /** Interrompe la trascrizione in corso, mantenendo il testo parziale gia' ottenuto. */
@@ -57,25 +80,51 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // Lavori attivi (compreso uno annullato che sta finendo il blocco in corso): il servizio resta finche' > 0.
-    private var activeJobs = 0
+    /** Scarica il modello di trascrizione; se c'era un audio in attesa, lo trascrive subito dopo. */
+    fun downloadModel() {
+        if (_download.value is DownloadState.Running) return
+        _download.value = DownloadState.Running(0f)
+        downloadJob = viewModelScope.launch {
+            serviceStarted()
+            try {
+                ModelDownloader.download(modelManager.modelsDir) { _download.value = DownloadState.Running(it) }
+                _modelReady.value = modelManager.findModel() != null
+                _download.value = DownloadState.Idle
+                pendingUri?.let { uri ->
+                    pendingUri = null
+                    onAudioReceived(uri)
+                }
+            } catch (e: CancellationException) {
+                _download.value = DownloadState.Idle
+                throw e
+            } catch (e: Throwable) {
+                _download.value = DownloadState.Failed(e.message ?: e.javaClass.simpleName)
+            } finally {
+                serviceFinished()
+            }
+        }
+    }
+
+    fun cancelDownload() {
+        downloadJob?.cancel()
+    }
 
     /** [modelName]: modello da usare (default: `small`, vedi [ModelManager.DEFAULT_MODEL]). */
     fun onAudioReceived(uri: Uri, modelName: String? = null) {
         _audio.value = readAudioInfo(getApplication(), uri)
         job?.cancel()
         job = viewModelScope.launch {
-            var serviceStarted = false
+            var started = false
             try {
                 val model = modelManager.findModel(modelName)
                 if (model == null) {
-                    _state.value = UiState.ModelMissing(modelManager.modelsDir.absolutePath, modelManager.describe())
+                    pendingUri = uri
+                    _modelReady.value = false
+                    _state.value = UiState.ModelMissing
                     return@launch
                 }
-                // Il servizio in primo piano evita che Android rallenti la CPU se l'utente lascia l'app.
-                TranscriptionService.start(getApplication())
-                activeJobs++
-                serviceStarted = true
+                serviceStarted()
+                started = true
                 _state.value = UiState.Decoding
                 val t0 = SystemClock.elapsedRealtime()
                 val pcm = AudioDecoder.decode(getApplication(), uri)
@@ -103,7 +152,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Throwable) {
                 _state.value = UiState.Error(e.message ?: e.javaClass.simpleName)
             } finally {
-                if (serviceStarted && --activeJobs == 0) TranscriptionService.stop(getApplication())
+                if (started) serviceFinished()
             }
         }
     }

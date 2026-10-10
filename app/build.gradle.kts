@@ -1,3 +1,11 @@
+import java.util.Properties
+
+// Credenziali di firma release: in keystore.properties (non versionato), la chiave sta fuori dal repo.
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -13,15 +21,28 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1"
+        versionName = "1.0"
         ndk {
             abiFilters += "arm64-v8a"
         }
     }
 
+    signingConfigs {
+        if (!keystoreProps.isEmpty) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Niente R8: le classi JNI di sherpa-onnx vanno trovate per nome dal codice nativo.
             isMinifyEnabled = false
+            if (!keystoreProps.isEmpty) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

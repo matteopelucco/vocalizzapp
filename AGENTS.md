@@ -12,7 +12,9 @@ Non aggiungere funzionalità fuori scopo (no chat, no account, no cloud, no anal
 - **Trascrizione**: on-device, offline, via **sherpa-onnx** (librerie native precompilate, niente NDK) con modello **Whisper multilingua** int8.
 - **Input**: l'app è destinataria di `ACTION_SEND` / `ACTION_SEND_MULTIPLE` con `audio/*` (Condividi da WhatsApp) + pulsante "scegli file".
 - **Decodifica audio**: `MediaExtractor` + `MediaCodec` (Opus/OGG, m4a, mp3...) → PCM 16 kHz mono float. Nessun ffmpeg.
-- **Modello esternalizzato (decisione utente)**: il modello Whisper NON va nell'APK, così può essere aggiornato/sostituito senza reinstallare l'app. Vive in `getExternalFilesDir("models")/<nome-modello>/` (`*-encoder.int8.onnx`, `*-decoder.int8.onnx`, `*-tokens.txt`). `ModelManager` lo individua a runtime; se manca, l'app lo dice e propone il download (da Hugging Face `csukuangfj/sherpa-onnx-whisper-*`). In sviluppo: `adb push` nella stessa cartella.
+- **Modello esternalizzato (decisione utente)**: il modello Whisper NON va nell'APK, così può essere aggiornato/sostituito senza reinstallare l'app. Vive in `getExternalFilesDir("models")/` come terna `<nome>-encoder.int8.onnx`, `<nome>-decoder.int8.onnx`, `<nome>-tokens.txt`. `ModelManager` lo individua a runtime; se manca, l'app propone il download in-app (`ModelDownloader`, da Hugging Face `csukuangfj/sherpa-onnx-whisper-small`, con ripresa e verifica delle dimensioni). In sviluppo si può anche usare `adb push`, ma la cartella `models` deve essere creata dall'app (vedi DESIGN.md §9).
+- **Modello unico: `small`** (decisione utente: nessuna scelta del modello nell'UI; `base` scartato per qualità).
+- **Servizio in primo piano**: `TranscriptionService` non fa lavoro, serve solo a evitare che HyperOS rallenti la CPU in background (48 s → 16 s su 44 s di audio). Parte con ogni trascrizione/download.
 - **Privacy**: l'audio non lascia mai il dispositivo. Il permesso INTERNET serve solo per scaricare/aggiornare il modello; mai per inviare audio o testo.
 - minSdk 26, targetSdk/compileSdk 35, package `com.matteopelucco.vocalizzapp`.
 
@@ -24,22 +26,35 @@ Non aggiungere funzionalità fuori scopo (no chat, no account, no cloud, no anal
 
 ## Comandi
 ```powershell
+.\scripts\setup-sherpa.ps1           # (una tantum) scarica le librerie native sherpa-onnx in app\src\main\jniLibs
 .\gradlew.bat assembleDebug          # build APK debug -> app\build\outputs\apk\debug\
 .\gradlew.bat installDebug           # build + install sul dispositivo collegato
-.\gradlew.bat test                   # unit test JVM
-.\gradlew.bat lintDebug              # lint
+.\gradlew.bat testDebugUnitTest      # unit test JVM
+.\gradlew.bat assembleRelease        # APK firmato -> app\build\outputs\apk\release\app-release.apk
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
 ```
 
-## Struttura prevista
+### Release firmata
+- La chiave sta **fuori dal repo**: `%USERPROFILE%\.vocalizzapp-keys\vocalizzapp-release.jks`; i riferimenti sono in `keystore.properties` (radice del progetto, ignorato da git). **Mai committarli né stamparne le password.** Senza la chiave l'app non si può più aggiornare, solo reinstallare: ricordare all'utente di tenerne un backup.
+- Una release ha firma diversa dalla debug: per passare dall'una all'altra serve `adb uninstall` (si perde il modello scaricato, che l'app riscarica da sola).
+- Su HyperOS l'installazione via USB richiede **telefono sbloccato e schermo acceso** e un tocco su "Installa"; se è bloccato fallisce con `INSTALL_FAILED_USER_RESTRICTED`. In alternativa: `adb push app-release.apk /sdcard/Download/` e installarlo dal telefono.
+- Versione in `app/build.gradle.kts` (`versionCode`/`versionName`): incrementare a ogni release.
+
+## Struttura
 ```
 app/src/main/java/com/matteopelucco/vocalizzapp/
-  MainActivity.kt        # entry point, gestisce intent SEND
-  ui/                    # schermate Compose (stato, risultato, copia/condividi)
-  audio/AudioDecoder.kt  # URI -> FloatArray 16 kHz mono
-  asr/Transcriber.kt     # wrapper sherpa-onnx (interfaccia + impl)
-  asr/ModelManager.kt    # localizzazione/estrazione del modello
-docs/DESIGN.md           # progettazione e roadmap
+  MainActivity.kt          # entry point, intent SEND, collega ViewModel e UI
+  MainViewModel.kt         # stato (UiState), trascrizione, download modello
+  AudioDecoder.kt          # URI -> FloatArray 16 kHz mono (MediaCodec)
+  AudioChunker.kt          # divide l'audio in blocchi <= 28 s tagliando nei silenzi
+  Transcriber.kt           # wrapper sherpa-onnx/Whisper (blocchi, parziali, chiusura sicura)
+  ModelManager.kt          # individua il modello in models/
+  ModelDownloader.kt       # download del modello con ripresa
+  TranscriptionService.kt  # servizio in primo piano anti-throttling
+  ui/Theme.kt, MainScreen.kt, Icons.kt
+app/src/main/java/com/k2fsa/sherpa/onnx/   # API Kotlin ufficiale di sherpa-onnx (NON rinominare: JNI)
+docs/DESIGN.md             # progettazione, benchmark, roadmap
+scripts/setup-sherpa.ps1
 ```
 
 ## Convenzioni
