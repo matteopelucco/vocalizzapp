@@ -80,3 +80,8 @@ fun VocalizzAppTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Compo
         content = content,
     )
 }
+
+/** Colore per le avvertenze non bloccanti (es. "potrebbe essere lento"): ambra, leggibile in chiaro e scuro. */
+@Composable
+fun warningColor(darkTheme: Boolean = isSystemInDarkTheme()): Color =
+    if (darkTheme) Color(0xFFFFB74D) else Color(0xFF9A5B00)

@@ -63,8 +63,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.matteopelucco.vocalizzapp.AudioInfo
-import com.matteopelucco.vocalizzapp.DownloadState
-import com.matteopelucco.vocalizzapp.ModelDownloader
+import com.matteopelucco.vocalizzapp.ModelCatalog
 import com.matteopelucco.vocalizzapp.R
 import com.matteopelucco.vocalizzapp.UiState
 import kotlinx.coroutines.delay
@@ -73,25 +72,65 @@ import kotlinx.coroutines.delay
 fun MainScreen(
     audio: AudioInfo?,
     state: UiState,
-    modelReady: Boolean,
-    download: DownloadState,
+    models: ModelsUi,
+    chooserOpen: Boolean,
     onPickFile: () -> Unit,
     onCancel: () -> Unit,
-    onDownloadModel: () -> Unit,
+    onOpenChooser: () -> Unit,
+    onCloseChooser: () -> Unit,
+    onDownloadModel: (String) -> Unit,
+    onUseModel: (String) -> Unit,
+    onDeleteModel: (String) -> Unit,
     onCancelDownload: () -> Unit,
 ) {
+    // Senza alcun modello l'app non puo' lavorare: la scelta del modello diventa la prima schermata.
+    val firstRun = models.installed.isEmpty()
+    Crossfade(targetState = firstRun || chooserOpen, label = "screen") { showChooser ->
+        if (showChooser) {
+            ModelChooserScreen(
+                models = models,
+                firstRun = firstRun,
+                onDownload = onDownloadModel,
+                onUse = onUseModel,
+                onDelete = onDeleteModel,
+                onCancelDownload = onCancelDownload,
+                onBack = onCloseChooser,
+            )
+        } else {
+            HomeScreen(audio, state, models.active, onPickFile, onCancel, onOpenChooser)
+        }
+    }
+}
+
+@Composable
+private fun HomeScreen(
+    audio: AudioInfo?,
+    state: UiState,
+    activeModel: String?,
+    onPickFile: () -> Unit,
+    onCancel: () -> Unit,
+    onOpenChooser: () -> Unit,
+) {
     val working = state is UiState.Decoding || state is UiState.Transcribing
-    val downloadCard: @Composable () -> Unit = { ModelDownloadCard(download, onDownloadModel, onCancelDownload) }
     Column(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .systemBarsPadding(),
     ) {
-        Header()
+        Header {
+            // Il modello in uso: toccandolo si puo' cambiare qualita'.
+            ActionPill(
+                icon = ChevronDownIcon,
+                label = ModelCatalog.byId(activeModel)?.let { stringResource(it.title) } ?: activeModel.orEmpty(),
+                highlighted = false,
+                iconAtEnd = true,
+                onClick = onOpenChooser,
+            )
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             Crossfade(targetState = audio == null && state is UiState.Idle, label = "content") { empty ->
-                if (empty) EmptyState(if (modelReady) null else downloadCard) else Content(audio, state, downloadCard)
+                if (empty) EmptyState() else Content(audio, state)
             }
         }
         Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
@@ -115,8 +154,9 @@ fun MainScreen(
     }
 }
 
+/** Intestazione con logo e nome; [trailing] e' un elemento facoltativo allineato a destra. */
 @Composable
-private fun Header() {
+internal fun Header(trailing: (@Composable () -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -127,22 +167,20 @@ private fun Header() {
             stringResource(R.string.app_name),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f),
         )
+        trailing?.invoke()
     }
 }
 
 @Composable
-private fun EmptyState(downloadCard: (@Composable () -> Unit)?) {
+private fun EmptyState() {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 36.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(
-            painterResource(R.drawable.ic_launcher_foreground),
-            contentDescription = null,
-            Modifier.size(if (downloadCard == null) 168.dp else 120.dp),
-        )
+        Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.size(168.dp))
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(R.string.empty_title),
@@ -157,83 +195,11 @@ private fun EmptyState(downloadCard: (@Composable () -> Unit)?) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        if (downloadCard != null) {
-            Spacer(Modifier.height(24.dp))
-            downloadCard()
-        }
-    }
-}
-
-/** Primo avvio: il modello di trascrizione non c'e' ancora, lo si scarica una volta sola. */
-@Composable
-private fun ModelDownloadCard(download: DownloadState, onDownload: () -> Unit, onCancel: () -> Unit) {
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(20.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                stringResource(R.string.model_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                stringResource(R.string.model_body, ModelDownloader.totalMegabytes),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            when (download) {
-                is DownloadState.Running -> {
-                    val progress by animateFloatAsState(download.progress, label = "download")
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth().height(6.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.primaryContainer,
-                        strokeCap = StrokeCap.Round,
-                        gapSize = 0.dp,
-                        drawStopIndicator = {},
-                    )
-                    Text(
-                        stringResource(R.string.model_downloading, (download.progress * 100).toInt()),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedButton(
-                        onClick = onCancel,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = MaterialTheme.shapes.medium,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    ) { Text(stringResource(R.string.cancel), style = MaterialTheme.typography.labelLarge) }
-                }
-                is DownloadState.Failed -> {
-                    Text(
-                        stringResource(R.string.model_failed, download.message),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    DownloadButton(stringResource(R.string.retry), onDownload)
-                }
-                DownloadState.Idle -> DownloadButton(stringResource(R.string.model_download), onDownload)
-            }
-        }
     }
 }
 
 @Composable
-private fun DownloadButton(label: String, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(48.dp),
-        shape = MaterialTheme.shapes.medium,
-        elevation = ButtonDefaults.buttonElevation(0.dp, 0.dp, 0.dp, 0.dp, 0.dp),
-    ) { Text(label, style = MaterialTheme.typography.labelLarge) }
-}
-
-@Composable
-private fun Content(audio: AudioInfo?, state: UiState, downloadCard: @Composable () -> Unit) {
+private fun Content(audio: AudioInfo?, state: UiState) {
     Column(
         Modifier
             .fillMaxSize()
@@ -243,9 +209,8 @@ private fun Content(audio: AudioInfo?, state: UiState, downloadCard: @Composable
     ) {
         FileCard(audio?.name, statusText(state), state)
         when (state) {
-            UiState.ModelMissing -> downloadCard()
             is UiState.Error -> MessageCard(stringResource(R.string.error, state.message), isError = true)
-            UiState.Idle, UiState.Decoding -> Unit
+            UiState.Idle, UiState.Decoding, UiState.ModelMissing -> Unit
             is UiState.Transcribing -> TranscriptCard(
                 state.partialText,
                 placeholder = stringResource(R.string.placeholder),
@@ -481,8 +446,15 @@ private fun ShareButton(text: String) {
     }
 }
 
+/** Pillola con icona ed etichetta; l'icona sta prima del testo, o dopo se [iconAtEnd]. */
 @Composable
-private fun ActionPill(icon: ImageVector, label: String, highlighted: Boolean, onClick: () -> Unit) {
+internal fun ActionPill(
+    icon: ImageVector,
+    label: String,
+    highlighted: Boolean,
+    iconAtEnd: Boolean = false,
+    onClick: () -> Unit,
+) {
     val container = if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
     val content = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
@@ -490,12 +462,18 @@ private fun ActionPill(icon: ImageVector, label: String, highlighted: Boolean, o
             .clip(RoundedCornerShape(50))
             .background(container)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(start = 12.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+            .padding(start = if (iconAtEnd) 14.dp else 12.dp, end = if (iconAtEnd) 10.dp else 14.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, Modifier.size(18.dp), tint = content)
-        Spacer(Modifier.width(6.dp))
+        if (!iconAtEnd) {
+            Icon(icon, contentDescription = null, Modifier.size(18.dp), tint = content)
+            Spacer(Modifier.width(6.dp))
+        }
         Text(label, style = MaterialTheme.typography.labelMedium, color = content)
+        if (iconAtEnd) {
+            Spacer(Modifier.width(2.dp))
+            Icon(icon, contentDescription = null, Modifier.size(18.dp), tint = content)
+        }
     }
 }
 

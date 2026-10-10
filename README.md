@@ -7,7 +7,8 @@ Condividi un vocale con VocalizzApp e dopo pochi secondi leggi cosa dice. Poi lo
 ## Caratteristiche
 
 - **Tutto sul telefono**: la trascrizione usa [Whisper](https://github.com/openai/whisper) in locale, tramite [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx). L'audio e il testo non vengono mai inviati a nessun server.
-- **Veloce**: circa 16 secondi per 44 secondi di audio su un POCO X6 Pro; un vocale da 10 secondi richiede circa 1 secondo.
+- **Qualità a scelta**: al primo avvio scegli quale modello scaricare, da *Veloce* (161 MB) a *Preciso* (1,0 GB). Più è grande, più il testo è accurato e più spazio occupa. Puoi cambiarlo quando vuoi dall'app.
+- **Veloce**: con il modello *Equilibrato* circa 16 secondi per 44 secondi di audio su un POCO X6 Pro; un vocale da 10 secondi richiede pochi secondi.
 - **Testo progressivo**: i vocali lunghi sono divisi nei punti di silenzio e il testo compare man mano, con un'animazione che mostra che il lavoro è in corso. Si può annullare.
 - **Copia e condividi** il testo con un tocco.
 - **Continua in background**: un servizio in primo piano evita che Android rallenti la trascrizione se esci dall'app o blocchi lo schermo.
@@ -17,19 +18,19 @@ Condividi un vocale con VocalizzApp e dopo pochi secondi leggi cosa dice. Poi lo
 
 - Android **8.0 (API 26)** o successivo.
 - Processore **ARM a 64 bit** (arm64-v8a): praticamente tutti i telefoni degli ultimi anni.
-- Circa **1,5 GB di RAM liberi** e **400 MB di spazio** per il modello di trascrizione.
-- Collegamento a internet **solo la prima volta**, per scaricare il modello (circa 375 MB, meglio con il Wi-Fi).
+- **Spazio** per il modello scelto (da 161 MB a 1,0 GB) e **RAM**: 3 GB per *Veloce*, 4 GB per *Equilibrato*, 8 GB per *Preciso*. L'app ti avvisa se il telefono è al limite.
+- Collegamento a internet **solo per scaricare il modello** (meglio con il Wi-Fi).
 
 Testata finora su un solo dispositivo: POCO X6 Pro (HyperOS, Android 16).
 
 ## Come si usa
 
-1. Apri l'app e tocca **Scarica il modello** (solo al primo avvio).
+1. Al primo avvio scegli la **qualità** (vedi sotto) e tocca **Scarica e inizia**.
 2. In WhatsApp tieni premuto su un vocale e scegli **Condividi** (in alcune versioni è nel menu ⋮ o in "Altro"), poi **VocalizzApp**.
 3. Aspetta il testo. Con **Copia** lo copi, con **Condividi** lo invii a un'altra app.
 4. In alternativa, dalla schermata iniziale tocca **Scegli file audio**.
 
-Se condividi un vocale prima di aver scaricato il modello, l'app lo scarica e poi trascrive da sola.
+Se condividi un vocale prima di aver scaricato un modello, l'app ti fa scegliere, lo scarica e poi trascrive da sola. Per cambiare qualità tocca il nome del modello in alto a destra: puoi usarne un altro, scaricarlo o eliminare quelli che non ti servono.
 
 ---
 
@@ -137,7 +138,7 @@ Tieni il telefono **sbloccato e con lo schermo acceso**: sui telefoni Xiaomi/POC
 
 ### 7. Primo avvio
 
-Apri **VocalizzApp** e tocca **Scarica il modello**. Il modello (circa 375 MB) viene salvato nello spazio privato dell'app. Da quel momento tutto funziona offline.
+Apri **VocalizzApp**: compare la scelta della qualità. Seleziona un modello e tocca **Scarica e inizia**. Il modello viene salvato nello spazio privato dell'app e da quel momento tutto funziona offline.
 
 ### 8. Versione di release firmata (facoltativo)
 
@@ -185,11 +186,20 @@ Se sul telefono c'è già la versione di sviluppo (firma diversa) devi prima dis
 
 ---
 
-## Il modello di trascrizione
+## I modelli di trascrizione
 
-- Il modello è **Whisper small**, in formato int8 per sherpa-onnx, preso da [csukuangfj/sherpa-onnx-whisper-small](https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small) su Hugging Face.
-- **Non è dentro l'APK**: si può quindi aggiornare senza reinstallare l'app.
-- Sta in `Android/data/com.matteopelucco.vocalizzapp/files/models/` e si compone di tre file: `small-encoder.int8.onnx`, `small-decoder.int8.onnx`, `small-tokens.txt`.
+Sono varianti di [Whisper](https://github.com/openai/whisper), in formato int8 per sherpa-onnx, prese da [csukuangfj su Hugging Face](https://huggingface.co/csukuangfj). **Non sono dentro l'APK**: si scaricano dall'app e si possono cambiare senza reinstallare.
+
+| Nome nell'app | Modello | Spazio | Precisione | Velocità | Note |
+|---|---|---|---|---|---|
+| Veloce | `base` | 161 MB | ●●○○○ | ●●●●● | sbaglia più spesso, anche sul senso delle frasi |
+| **Equilibrato** (consigliato) | `small` | 375 MB | ●●●○○ | ●●●○○ | buon compromesso |
+| Preciso | `turbo` (large-v3-turbo) | 1,0 GB | ●●●●● | ●●○○○ | capisce meglio parole e nomi; nei vocali molto lunghi può omettere la punteggiatura |
+
+I valori sono stati misurati su vocali WhatsApp in italiano (vedi [docs/DESIGN.md](docs/DESIGN.md), sezione 8): su un POCO X6 Pro, 44 s di audio richiedono circa 5 s con *Veloce*, 16 s con *Equilibrato* e 22 s con *Preciso*.
+
+- I file stanno in `Android/data/com.matteopelucco.vocalizzapp/files/models/`, tre per modello: `<nome>-encoder.int8.onnx`, `<nome>-decoder.int8.onnx`, `<nome>-tokens.txt`.
+- Il download riprende da dove si era fermato e verifica le dimensioni dei file.
 - Se il download interno non è possibile, in sviluppo puoi copiare i file a mano con `adb push`. **Attenzione**: la cartella `models` deve essere creata dall'app (lo fa al primo avvio). Se la crei tu con adb appartiene all'utente "shell" e l'app non riesce a leggerla.
 
 ```bash
@@ -208,7 +218,8 @@ app/src/main/java/com/matteopelucco/vocalizzapp/
   AudioDecoder.kt          audio qualsiasi -> PCM 16 kHz mono (MediaCodec)
   AudioChunker.kt          divide l'audio in blocchi tagliando nei silenzi
   Transcriber.kt           wrapper di sherpa-onnx / Whisper
-  ModelManager.kt          individua il modello sul telefono
+  ModelCatalog.kt          i modelli offerti (nome, dimensioni, precisione, velocità)
+  ModelManager.kt          modelli sul telefono, modello in uso, RAM e spazio
   ModelDownloader.kt       download del modello, con ripresa
   TranscriptionService.kt  servizio in primo piano contro il rallentamento in background
   ui/                      tema e schermate Jetpack Compose
@@ -235,9 +246,12 @@ Con un'app di sviluppo installata, si può simulare la condivisione di un vocale
 adb push vocale.opus /sdcard/Android/data/com.matteopelucco.vocalizzapp/files/test.opus
 adb shell am start -a android.intent.action.SEND -t audio/ogg \
   --eu android.intent.extra.STREAM file:///sdcard/Android/data/com.matteopelucco.vocalizzapp/files/test.opus \
+  --es model small \
   -n com.matteopelucco.vocalizzapp/.MainActivity
 adb logcat -d -s VocalizzApp:I      # tempi di decodifica, caricamento e trascrizione
 ```
+
+Nelle build di sviluppo (debuggabili) ci sono anche due comandi per provare la scelta del modello senza toccare lo schermo: `--es download base` scarica un modello (`base`, `small` o `turbo`) e `--ez chooser true` apre la schermata di scelta.
 
 Altri dettagli, benchmark e decisioni di progetto sono in [docs/DESIGN.md](docs/DESIGN.md).
 
@@ -252,15 +266,15 @@ Altri dettagli, benchmark e decisioni di progetto sono in [docs/DESIGN.md](docs/
 | Errore sulla versione di Java (`Unsupported class file major version`, "requires Java 17") | Usa un JDK 17 o superiore e imposta `JAVA_HOME`. |
 | L'app mostra un errore di libreria nativa (`dlopen failed`, `UnsatisfiedLinkError`) | Mancano le librerie di sherpa-onnx: esegui lo script `setup-sherpa`, poi ricompila. |
 | Trascrizione molto lenta (tre volte più del solito) | Il telefono ha lo schermo spento o l'app era in secondo piano senza servizio, e Android ha limitato la CPU. Tieni acceso lo schermo; anche il surriscaldamento rallenta. |
-| "Serve il modello di trascrizione" | Il modello non è stato ancora scaricato: tocca **Scarica il modello** (serve internet). |
-| Download del modello interrotto | Riprova: riparte da dove si era fermato. Controlla lo spazio libero (servono circa 400 MB). |
+| Compare la scelta della qualità a ogni avvio | Non c'è ancora nessun modello sul telefono: scegline uno e tocca **Scarica e inizia** (serve internet). |
+| Download del modello interrotto | Riprova: riparte da dove si era fermato. Controlla lo spazio libero: serve un po' più della dimensione indicata sulla scheda. |
 | VocalizzApp non compare tra le app di condivisione | Condividi proprio un messaggio **vocale** (non un file qualsiasi) e cerca l'app nell'elenco completo di Android. |
 
 ## Limiti noti
 
 - Trascrive in **italiano** (la lingua è fissa).
 - Testata solo con vocali WhatsApp (`.opus`) e su un solo telefono; con altre app e dispositivi potrebbero esserci differenze.
-- Su telefoni di fascia bassa il modello `small` può essere più lento del parlato o richiedere troppa memoria.
+- Su telefoni di fascia bassa i modelli più grandi possono essere più lenti del parlato o richiedere troppa memoria: l'app avvisa quando RAM o spazio sono al limite.
 - Solo `arm64-v8a`: non gira su emulatori x86 e su telefoni a 32 bit.
 
 ## Crediti e licenze

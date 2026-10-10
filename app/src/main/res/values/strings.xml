@@ -4,6 +4,7 @@
     <string name="empty_subtitle">Condividi un vocale da WhatsApp con VocalizzApp e ottieni subito il testo, direttamente sul tuo telefono.</string>
     <string name="pick_file">Scegli file audio</string>
     <string name="cancel">Annulla</string>
+    <string name="back">Indietro</string>
     <string name="share">Condividi</string>
     <string name="notification_channel">Trascrizione in corso</string>
     <string name="notification_text">Sto lavorando per te…</string>
@@ -18,11 +19,40 @@
     <string name="placeholder">Il testo comparirà qui man mano che viene trascritto.</string>
     <string name="cancelled">Nessun testo ottenuto prima dell\'interruzione.</string>
     <string name="no_speech">Nessun parlato riconosciuto.</string>
-    <string name="model_title">Serve il modello di trascrizione</string>
-    <string name="model_body">Un download una tantum di circa %1$d MB, meglio con il Wi-Fi. Poi tutto funziona offline, direttamente sul telefono: i tuoi vocali non lasciano mai il dispositivo.</string>
-    <string name="model_download">Scarica il modello</string>
-    <string name="model_downloading">Download in corso · %1$d%%</string>
-    <string name="model_failed">Download interrotto: %1$s</string>
-    <string name="retry">Riprova</string>
     <string name="error">Errore: %1$s</string>
+
+    <!-- Scelta del modello -->
+    <string name="chooser_title_first">Scegli la qualità</string>
+    <string name="chooser_title">Qualità della trascrizione</string>
+    <string name="chooser_subtitle">Più il modello è grande, più il testo è preciso, ma occupa più spazio e ci mette di più. Puoi cambiarlo quando vuoi.</string>
+
+    <string name="model_base_title">Veloce</string>
+    <string name="model_base_tagline">Rapidissimo e leggero, ma sbaglia più spesso: adatto a vocali brevi e chiari.</string>
+    <string name="model_small_title">Equilibrato</string>
+    <string name="model_small_tagline">Il giusto compromesso tra precisione, velocità e spazio.</string>
+    <string name="model_turbo_title">Preciso</string>
+    <string name="model_turbo_tagline">Capisce meglio parole e nomi, ma è più pesante e un po\' più lento.</string>
+    <string name="model_turbo_note">Nei vocali molto lunghi può omettere la punteggiatura.</string>
+
+    <string name="meter_precision">Precisione</string>
+    <string name="meter_speed">Velocità</string>
+    <string name="badge_recommended">Consigliato</string>
+    <string name="badge_in_use">In uso</string>
+    <string name="badge_installed">Scaricato</string>
+    <string name="device_line">Il tuo telefono · %1$s di RAM · %2$s liberi</string>
+    <string name="warn_space">Spazio insufficiente: ne servono più di %1$s</string>
+    <string name="warn_ram">Il tuo telefono ha poca memoria: potrebbe essere lento o instabile.</string>
+
+    <string name="action_download_start">Scarica e inizia · %1$s</string>
+    <string name="action_download">Scarica · %1$s</string>
+    <string name="action_retry">Riprova · %1$s</string>
+    <string name="action_use">Usa questo modello</string>
+    <string name="action_in_use">In uso</string>
+    <string name="privacy_note">Il download richiede internet, meglio con il Wi-Fi. Poi tutto funziona offline: i tuoi vocali non lasciano mai il telefono.</string>
+    <string name="model_downloading">Download di %1$s · %2$d%%</string>
+    <string name="model_failed">Download interrotto: %1$s</string>
+
+    <string name="delete">Elimina</string>
+    <string name="delete_title">Eliminare «%1$s»?</string>
+    <string name="delete_body">Libererai %1$s. Potrai scaricarlo di nuovo quando vuoi.</string>
 </resources>

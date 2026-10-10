@@ -81,3 +81,29 @@ Su HyperOS/MIUI (POCO) serve anche **Installa via USB** (Opzioni sviluppatore), 
 ## 11. Prestazioni in background (importante)
 Con schermo bloccato o app non in primo piano HyperOS limita la CPU: lo stesso vocale da 44 s con `small` passa da ~17 s (schermo acceso) a ~48 s. Se l'utente condivide un vocale e poi torna a WhatsApp, la trascrizione rallenta o puo' essere sospesa.
 Possibile soluzione (da valutare in F6): servizio in primo piano (`FOREGROUND_SERVICE_DATA_SYNC` + notifica) per le trascrizioni lunghe; oppure semplicemente avvisare l'utente di restare nell'app.
+
+## 12. Qualità del testo: confronto tra modelli (esperimento sul PC, ottobre 2026)
+Motivazione: un'app concorrente trascriveva meglio lo stesso vocale. Banco di prova: `bench.py` con la stessa versione di sherpa-onnx dell'app (1.13.8), stesso taglio dei blocchi, vocale WhatsApp di 12 s ("ufficio postale"). Gli errori del telefono si riproducono sul PC, quindi il confronto è affidabile.
+
+| Modello | Spazio | Esito sul vocale di 12 s |
+|---|---|---|
+| `base` int8 | 161 MB | errori sul senso ("assurre" per "stasera", frasi spezzate) |
+| `small` int8 | 375 MB | "ruffigio postale", "so" per "tesoro", "noi tre" per "inoltre" |
+| `small` fp32 | 970 MB | corregge "inoltre", restano "rufficio" e "so" |
+| `medium` int8 | 945 MB | meglio, restano "ruffigio" e "zoro"; molto lento (37 s sul PC) |
+| `turbo` int8 | 1,03 GB | solo "rufficio" sbagliato; "tesoro" giusto, punteggiatura corretta |
+
+Conclusioni:
+- La causa principale è **la taglia del modello**. La quantizzazione int8 pesa poco; il ricampionamento non c'entra (WhatsApp registra già a 16 kHz: risultato identico con un ricampionatore di alta qualità).
+- `turbo` su POCO X6 Pro: 12 s di audio in ~7 s (`small` ~5 s), 44 s in ~22 s (`small` ~17 s); RAM ~1,8 GB contro ~1,2 GB.
+- **Limite di `turbo`**: sul vocale di 44 s il primo blocco di 28 s è uscito senza punteggiatura né maiuscole; con blocchi da 20 s ha ripetuto una frase. I blocchi più corti (10-15 s) non risolvono. Per questo la scheda dice che "nei vocali molto lunghi può omettere la punteggiatura". Possibili rimedi da valutare: post-elaborazione della punteggiatura, blocchi basati su VAD, modelli successivi.
+- Il modello `distil-large-v3` è solo inglese: non adatto.
+- L'app concorrente (installata dal Play Store) pesa ~29 MB, quindi non contiene il modello; non è stato analizzato il suo funzionamento. Se la trascrizione avviene su un server, l'audio lascia il telefono: differenza di principio con VocalizzApp.
+
+## 13. Scelta del modello (schermata)
+- Decisione utente: al primo avvio si sceglie cosa scaricare, spiegando con poche parole il rapporto tra qualità, velocità e spazio. Si può cambiare in seguito dal nome del modello in alto a destra.
+- Tre modelli nel catalogo (`ModelCatalog.kt`): **Veloce** (`base`), **Equilibrato** (`small`, consigliato), **Preciso** (`turbo`). Ogni scheda mostra nome, dimensione, una riga di descrizione, due indicatori a 5 tacche (precisione, velocità), eventuale avvertenza e stato (In uso / Scaricato).
+- Il telefono è controllato prima di scaricare: spazio libero (serve il 30% in più della dimensione) e RAM (soglie 3/4/8 GB, con tolleranza perché `totalMem` è sotto il valore nominale). Spazio insufficiente blocca il pulsante; RAM scarsa mostra solo un avviso.
+- Download in primo piano (servizio), con ripresa; un solo download alla volta; annullabile. Al termine il modello diventa quello in uso e un eventuale audio in attesa viene trascritto.
+- Eliminazione dei modelli non in uso con conferma, non durante una trascrizione.
+- Test automatici: `ModelCatalogTest` (formati di dimensione, completezza del catalogo, soglie RAM/spazio).

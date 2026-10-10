@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.matteopelucco.vocalizzapp.ui.MainScreen
+import com.matteopelucco.vocalizzapp.ui.ModelsUi
 import com.matteopelucco.vocalizzapp.ui.VocalizzAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -29,8 +30,11 @@ class MainActivity : ComponentActivity() {
             VocalizzAppTheme {
                 val audio by viewModel.audio.collectAsState()
                 val state by viewModel.state.collectAsState()
-                val modelReady by viewModel.modelReady.collectAsState()
+                val installed by viewModel.installed.collectAsState()
+                val activeModel by viewModel.activeModel.collectAsState()
+                val device by viewModel.device.collectAsState()
                 val download by viewModel.download.collectAsState()
+                val chooserOpen by viewModel.chooserOpen.collectAsState()
                 val picker = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent()
                 ) { uri -> uri?.let(viewModel::onAudioReceived) }
@@ -38,11 +42,21 @@ class MainActivity : ComponentActivity() {
                 MainScreen(
                     audio = audio,
                     state = state,
-                    modelReady = modelReady,
-                    download = download,
+                    models = ModelsUi(
+                        installed = installed,
+                        active = activeModel,
+                        download = download,
+                        device = device,
+                        busy = state is UiState.Decoding || state is UiState.Transcribing,
+                    ),
+                    chooserOpen = chooserOpen,
                     onPickFile = { picker.launch("audio/*") },
                     onCancel = viewModel::cancel,
+                    onOpenChooser = viewModel::openChooser,
+                    onCloseChooser = viewModel::closeChooser,
                     onDownloadModel = viewModel::downloadModel,
+                    onUseModel = viewModel::selectModel,
+                    onDeleteModel = viewModel::deleteModel,
                     onCancelDownload = viewModel::cancelDownload,
                 )
             }
@@ -56,11 +70,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent) {
-        // Solo build di sviluppo: avvia il download del modello da adb (`--ez download true`).
+        // Solo build di sviluppo: avvia il download di un modello da adb (`--es download small`).
         val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-        val startDownload = debuggable && intent.getBooleanExtra("download", false)
+        val downloadId = if (debuggable) intent.getStringExtra("download") else null
+        if (debuggable && intent.getBooleanExtra("chooser", false)) viewModel.openChooser()
         if (intent.action != Intent.ACTION_SEND) {
-            if (startDownload) viewModel.downloadModel()
+            downloadId?.let(viewModel::downloadModel)
             return
         }
         val uri: Uri? = if (Build.VERSION.SDK_INT >= 33) {
@@ -70,6 +85,6 @@ class MainActivity : ComponentActivity() {
         }
         // L'extra "model" serve solo per i test da adb: sceglie il modello Whisper da usare.
         uri?.let { viewModel.onAudioReceived(it, intent.getStringExtra("model")) }
-        if (startDownload) viewModel.downloadModel()
+        downloadId?.let(viewModel::downloadModel)
     }
 }

@@ -12,40 +12,31 @@ import kotlinx.coroutines.withContext
 
 sealed interface DownloadState {
     data object Idle : DownloadState
-    data class Running(val progress: Float) : DownloadState
-    data class Failed(val message: String) : DownloadState
+    data class Running(val modelId: String, val progress: Float) : DownloadState
+    data class Failed(val modelId: String, val message: String) : DownloadState
 }
 
 /**
- * Scarica il modello Whisper in `models/`. Unico uso della rete dell'app: l'audio non esce mai dal telefono.
+ * Scarica un modello Whisper in `models/`. Unico uso della rete dell'app: l'audio non esce mai dal telefono.
  * Ogni file passa da `.part` (con ripresa se interrotto) e viene rinominato solo se la dimensione e' quella attesa.
  */
 object ModelDownloader {
-    private const val BASE_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/main/"
+    private const val HOST = "https://huggingface.co/csukuangfj/"
 
-    /** File del modello `small` int8 con la loro dimensione esatta in byte. */
-    private val FILES = listOf(
-        "small-encoder.int8.onnx" to 112_442_483L,
-        "small-decoder.int8.onnx" to 262_226_114L,
-        "small-tokens.txt" to 816_730L,
-    )
-
-    /** Dimensione totale in MB, per mostrarla all'utente. */
-    val totalMegabytes: Int = (FILES.sumOf { it.second } / 1_000_000L).toInt()
-
-    suspend fun download(dir: File, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
+    suspend fun download(option: ModelOption, dir: File, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
         dir.mkdirs()
-        val total = FILES.sumOf { it.second }
+        val baseUrl = "$HOST${option.repo}/resolve/main/"
+        val total = option.totalBytes
         var done = 0L
         var lastReport = 0L
-        for ((name, size) in FILES) {
+        for ((name, size) in option.files) {
             val target = File(dir, name)
             if (target.exists() && target.length() == size) {
                 done += size
                 continue
             }
             val part = File(dir, "$name.part")
-            downloadFile(URL(BASE_URL + name), part, size) { read ->
+            downloadFile(URL(baseUrl + name), part, size) { read ->
                 val now = SystemClock.elapsedRealtime()
                 if (now - lastReport > 150) {
                     lastReport = now

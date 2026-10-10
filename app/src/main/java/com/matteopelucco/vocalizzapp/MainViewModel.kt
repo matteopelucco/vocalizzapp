@@ -36,11 +36,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow<UiState>(UiState.Idle)
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    private val _modelReady = MutableStateFlow(modelManager.findModel() != null)
-    val modelReady: StateFlow<Boolean> = _modelReady.asStateFlow()
+    // Modelli: quali sono sul telefono, quale e' in uso, quanta RAM/spazio ha il telefono.
+    private val _installed = MutableStateFlow(modelManager.installedIds())
+    val installed: StateFlow<Set<String>> = _installed.asStateFlow()
+
+    private val _activeModel = MutableStateFlow(modelManager.findModel()?.name)
+    val activeModel: StateFlow<String?> = _activeModel.asStateFlow()
+
+    private val _device = MutableStateFlow(modelManager.deviceInfo())
+    val device: StateFlow<DeviceInfo> = _device.asStateFlow()
 
     private val _download = MutableStateFlow<DownloadState>(DownloadState.Idle)
     val download: StateFlow<DownloadState> = _download.asStateFlow()
+
+    private val _chooserOpen = MutableStateFlow(false)
+    val chooserOpen: StateFlow<Boolean> = _chooserOpen.asStateFlow()
 
     private var job: Job? = null
     private var downloadJob: Job? = null
@@ -71,25 +81,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (--activeJobs == 0) TranscriptionService.stop(getApplication())
     }
 
-    /** Interrompe la trascrizione in corso, mantenendo il testo parziale gia' ottenuto. */
-    fun cancel() {
-        val current = _state.value
-        if (current is UiState.Decoding || current is UiState.Transcribing) {
-            job?.cancel()
-            _state.value = UiState.Cancelled((current as? UiState.Transcribing)?.partialText.orEmpty())
-        }
+    private fun refreshModels() {
+        _installed.value = modelManager.installedIds()
+        _activeModel.value = modelManager.findModel()?.name
+        _device.value = modelManager.deviceInfo()
     }
 
-    /** Scarica il modello di trascrizione; se c'era un audio in attesa, lo trascrive subito dopo. */
-    fun downloadModel() {
+    // --- Scelta del modello ---------------------------------------------------------------------
+
+    fun openChooser() {
+        refreshModels()
+        _chooserOpen.value = true
+    }
+
+    fun closeChooser() {
+        _chooserOpen.value = false
+    }
+
+    /** Usa un modello gia' scaricato. */
+    fun selectModel(id: String) {
+        if (id !in modelManager.installedIds()) return
+        modelManager.activeId = id
+        refreshModels()
+        _chooserOpen.value = false
+    }
+
+    /** Elimina un modello per liberare spazio (non durante una trascrizione). */
+    fun deleteModel(id: String) {
+        if (activeJobs > 0) return
+        if (transcriberModel == id) {
+            transcriber?.close()
+            transcriber = null
+            transcriberModel = null
+        }
+        modelManager.delete(id)
+        refreshModels()
+    }
+
+    /** Scarica un modello e lo rende quello in uso; se c'era un audio in attesa, lo trascrive subito dopo. */
+    fun downloadModel(id: String) {
+        val option = ModelCatalog.byId(id) ?: return
         if (_download.value is DownloadState.Running) return
-        _download.value = DownloadState.Running(0f)
+        _download.value = DownloadState.Running(id, 0f)
         downloadJob = viewModelScope.launch {
             serviceStarted()
             try {
-                ModelDownloader.download(modelManager.modelsDir) { _download.value = DownloadState.Running(it) }
-                _modelReady.value = modelManager.findModel() != null
+                ModelDownloader.download(option, modelManager.modelsDir) {
+                    _download.value = DownloadState.Running(id, it)
+                }
+                modelManager.activeId = id
+                refreshModels()
                 _download.value = DownloadState.Idle
+                _chooserOpen.value = false
                 pendingUri?.let { uri ->
                     pendingUri = null
                     onAudioReceived(uri)
@@ -98,7 +141,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _download.value = DownloadState.Idle
                 throw e
             } catch (e: Throwable) {
-                _download.value = DownloadState.Failed(e.message ?: e.javaClass.simpleName)
+                _download.value = DownloadState.Failed(id, e.message ?: e.javaClass.simpleName)
             } finally {
                 serviceFinished()
             }
@@ -109,7 +152,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         downloadJob?.cancel()
     }
 
-    /** [modelName]: modello da usare (default: `small`, vedi [ModelManager.DEFAULT_MODEL]). */
+    // --- Trascrizione ---------------------------------------------------------------------------
+
+    /** Interrompe la trascrizione in corso, mantenendo il testo parziale gia' ottenuto. */
+    fun cancel() {
+        val current = _state.value
+        if (current is UiState.Decoding || current is UiState.Transcribing) {
+            job?.cancel()
+            _state.value = UiState.Cancelled((current as? UiState.Transcribing)?.partialText.orEmpty())
+        }
+    }
+
+    /** [modelName]: modello da usare solo per questa trascrizione (test da adb); di norma quello scelto. */
     fun onAudioReceived(uri: Uri, modelName: String? = null) {
         _audio.value = readAudioInfo(getApplication(), uri)
         job?.cancel()
@@ -119,7 +173,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val model = modelManager.findModel(modelName)
                 if (model == null) {
                     pendingUri = uri
-                    _modelReady.value = false
+                    refreshModels()
                     _state.value = UiState.ModelMissing
                     return@launch
                 }

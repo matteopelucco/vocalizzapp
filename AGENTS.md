@@ -12,8 +12,8 @@ Non aggiungere funzionalità fuori scopo (no chat, no account, no cloud, no anal
 - **Trascrizione**: on-device, offline, via **sherpa-onnx** (librerie native precompilate, niente NDK) con modello **Whisper multilingua** int8.
 - **Input**: l'app è destinataria di `ACTION_SEND` / `ACTION_SEND_MULTIPLE` con `audio/*` (Condividi da WhatsApp) + pulsante "scegli file".
 - **Decodifica audio**: `MediaExtractor` + `MediaCodec` (Opus/OGG, m4a, mp3...) → PCM 16 kHz mono float. Nessun ffmpeg.
-- **Modello esternalizzato (decisione utente)**: il modello Whisper NON va nell'APK, così può essere aggiornato/sostituito senza reinstallare l'app. Vive in `getExternalFilesDir("models")/` come terna `<nome>-encoder.int8.onnx`, `<nome>-decoder.int8.onnx`, `<nome>-tokens.txt`. `ModelManager` lo individua a runtime; se manca, l'app propone il download in-app (`ModelDownloader`, da Hugging Face `csukuangfj/sherpa-onnx-whisper-small`, con ripresa e verifica delle dimensioni). In sviluppo si può anche usare `adb push`, ma la cartella `models` deve essere creata dall'app (vedi DESIGN.md §9).
-- **Modello unico: `small`** (decisione utente: nessuna scelta del modello nell'UI; `base` scartato per qualità).
+- **Modello esternalizzato (decisione utente)**: il modello Whisper NON va nell'APK, così può essere aggiornato/sostituito senza reinstallare l'app. Vive in `getExternalFilesDir("models")/` come terna `<nome>-encoder.int8.onnx`, `<nome>-decoder.int8.onnx`, `<nome>-tokens.txt`. `ModelManager` lo individua a runtime; se manca, l'app mostra la scelta e scarica in-app (`ModelDownloader`, da Hugging Face `csukuangfj/sherpa-onnx-whisper-<nome>`, con ripresa e verifica delle dimensioni). In sviluppo si può anche usare `adb push`, ma la cartella `models` deve essere creata dall'app (vedi DESIGN.md §9).
+- **Scelta del modello (decisione utente)**: al primo avvio l'utente sceglie cosa scaricare tra `base` (Veloce, 161 MB), `small` (Equilibrato, 375 MB, consigliato) e `turbo` (Preciso, 1,0 GB); poi può cambiare, scaricarne altri o eliminarli. Il catalogo è in `ModelCatalog.kt` (file, dimensioni esatte, precisione e velocità misurate, RAM minima) e la scheda avvisa se RAM o spazio sono al limite. Per aggiungere un modello: nuova voce nel catalogo + stringhe in `strings.xml` + benchmark in `docs/DESIGN.md`.
 - **Servizio in primo piano**: `TranscriptionService` non fa lavoro, serve solo a evitare che HyperOS rallenti la CPU in background (48 s → 16 s su 44 s di audio). Parte con ogni trascrizione/download.
 - **Privacy**: l'audio non lascia mai il dispositivo. Il permesso INTERNET serve solo per scaricare/aggiornare il modello; mai per inviare audio o testo.
 - minSdk 26, targetSdk/compileSdk 35, package `com.matteopelucco.vocalizzapp`.
@@ -48,10 +48,11 @@ app/src/main/java/com/matteopelucco/vocalizzapp/
   AudioDecoder.kt          # URI -> FloatArray 16 kHz mono (MediaCodec)
   AudioChunker.kt          # divide l'audio in blocchi <= 28 s tagliando nei silenzi
   Transcriber.kt           # wrapper sherpa-onnx/Whisper (blocchi, parziali, chiusura sicura)
-  ModelManager.kt          # individua il modello in models/
+  ModelCatalog.kt          # modelli offerti: id, file, dimensioni, precisione/velocità
+  ModelManager.kt          # modelli installati, modello in uso (SharedPreferences), RAM/spazio, eliminazione
   ModelDownloader.kt       # download del modello con ripresa
   TranscriptionService.kt  # servizio in primo piano anti-throttling
-  ui/Theme.kt, MainScreen.kt, Icons.kt
+  ui/Theme.kt, MainScreen.kt, ModelChooser.kt, Icons.kt
 app/src/main/java/com/k2fsa/sherpa/onnx/   # API Kotlin ufficiale di sherpa-onnx (NON rinominare: JNI)
 docs/DESIGN.md             # progettazione, benchmark, roadmap
 scripts/setup-sherpa.ps1
