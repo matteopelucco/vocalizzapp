@@ -171,7 +171,7 @@ fun ModelChooserScreen(
 }
 
 @Composable
-private fun BackBar(onBack: () -> Unit) {
+internal fun BackBar(onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
         Row(
             Modifier

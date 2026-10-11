@@ -11,6 +11,7 @@ Condividi un vocale con VocalizzApp e dopo pochi secondi leggi cosa dice. Poi lo
 - **Veloce**: con il modello *Equilibrato* circa 16 secondi per 44 secondi di audio su un POCO X6 Pro; un vocale da 10 secondi richiede pochi secondi.
 - **Testo progressivo**: i vocali lunghi sono divisi nei punti di silenzio e il testo compare man mano, con un'animazione che mostra che il lavoro è in corso. Si può annullare.
 - **Copia e condividi** il testo con un tocco.
+- **Cronologia**: i testi trascritti restano salvati sul telefono. Nella schermata iniziale vedi gli ultimi 3 (prima riga e data); con **Vedi tutti** scorri l'elenco completo, caricato a 10 alla volta. Toccando un testo lo rivedi per intero, con Copia e Condividi.
 - **Continua in background**: un servizio in primo piano evita che Android rallenti la trascrizione se esci dall'app o blocchi lo schermo.
 - Tema chiaro e scuro, in italiano.
 
@@ -27,7 +28,7 @@ Testata finora su un solo dispositivo: POCO X6 Pro (HyperOS, Android 16).
 
 1. Al primo avvio scegli la **qualità** (vedi sotto) e tocca **Scarica e inizia**.
 2. In WhatsApp tieni premuto su un vocale e scegli **Condividi** (in alcune versioni è nel menu ⋮ o in "Altro"), poi **VocalizzApp**.
-3. Aspetta il testo. Con **Copia** lo copi, con **Condividi** lo invii a un'altra app.
+3. Aspetta il testo. Con **Copia** lo copi, con **Condividi** lo invii a un'altra app. Il testo viene salvato nella cronologia.
 4. In alternativa, dalla schermata iniziale tocca **Scegli file audio**.
 
 Se condividi un vocale prima di aver scaricato un modello, l'app ti fa scegliere, lo scarica e poi trascrive da sola. Per cambiare qualità tocca il nome del modello in alto a destra: puoi usarne un altro, scaricarlo o eliminare quelli che non ti servono.
@@ -187,6 +188,12 @@ Se sul telefono c'è già la versione di sviluppo (firma diversa) devi prima dis
 **Installare senza cavo:** copia `app-release.apk` sul telefono (per esempio nella cartella Download), aprilo da "File" e tocca Installa. Android può chiedere di consentire le installazioni da quell'app.
 
 ---
+
+## La cronologia dei testi
+
+- I testi trascritti sono salvati in un database privato dell'app (`transcripts.db`), che nessun'altra app può leggere e che non finisce nei backup. Non lasciano mai il telefono. **Non sono cifrati**: chi ha accesso al telefono sbloccato può leggerli dall'app. Disinstallare l'app li cancella.
+- Si salvano solo le trascrizioni completate; quelle interrotte o senza parlato no.
+- Ogni riga mostra la prima riga del testo, i puntini di sospensione se continua, e data e ora della trascrizione (ai minuti).
 
 ## I modelli di trascrizione
 

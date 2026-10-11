@@ -2,6 +2,9 @@ package com.matteopelucco.vocalizzapp.ui
 
 import android.content.ClipData
 import android.content.Intent
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -69,9 +72,13 @@ import com.matteopelucco.vocalizzapp.AudioInfo
 import com.matteopelucco.vocalizzapp.BuildConfig
 import com.matteopelucco.vocalizzapp.ModelCatalog
 import com.matteopelucco.vocalizzapp.R
+import com.matteopelucco.vocalizzapp.SavedTranscript
 import com.matteopelucco.vocalizzapp.UiState
+import com.matteopelucco.vocalizzapp.formatTranscriptDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private enum class Screen { Chooser, History, Home }
 
 @Composable
 fun MainScreen(
@@ -79,6 +86,7 @@ fun MainScreen(
     state: UiState,
     models: ModelsUi,
     chooserOpen: Boolean,
+    saved: SavedUi,
     onPickFile: () -> Unit,
     onCancel: () -> Unit,
     onOpenChooser: () -> Unit,
@@ -87,12 +95,23 @@ fun MainScreen(
     onUseModel: (String) -> Unit,
     onDeleteModel: (String) -> Unit,
     onCancelDownload: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onCloseHistory: () -> Unit,
+    onLoadMoreHistory: () -> Unit,
+    onOpenSaved: (SavedTranscript) -> Unit,
+    onDismissSaved: () -> Unit,
 ) {
     // Senza alcun modello l'app non puo' lavorare: la scelta del modello diventa la prima schermata.
     val firstRun = models.installed.isEmpty()
-    Crossfade(targetState = firstRun || chooserOpen, label = "screen") { showChooser ->
-        if (showChooser) {
-            ModelChooserScreen(
+    val screen = when {
+        firstRun || chooserOpen -> Screen.Chooser
+        saved.history.open -> Screen.History
+        else -> Screen.Home
+    }
+    val working = state is UiState.Decoding || state is UiState.Transcribing
+    Crossfade(targetState = screen, label = "screen") { current ->
+        when (current) {
+            Screen.Chooser -> ModelChooserScreen(
                 models = models,
                 firstRun = firstRun,
                 onDownload = onDownloadModel,
@@ -101,8 +120,25 @@ fun MainScreen(
                 onCancelDownload = onCancelDownload,
                 onBack = onCloseChooser,
             )
-        } else {
-            HomeScreen(audio, state, models.active, onPickFile, onCancel, onOpenChooser)
+            Screen.History -> HistoryScreen(
+                history = saved.history,
+                enabled = !working,
+                onBack = onCloseHistory,
+                onLoadMore = onLoadMoreHistory,
+                onOpen = onOpenSaved,
+            )
+            Screen.Home -> HomeScreen(
+                audio = audio,
+                state = state,
+                activeModel = models.active,
+                saved = saved,
+                onPickFile = onPickFile,
+                onCancel = onCancel,
+                onOpenChooser = onOpenChooser,
+                onOpenHistory = onOpenHistory,
+                onOpenSaved = onOpenSaved,
+                onDismissSaved = onDismissSaved,
+            )
         }
     }
 }
@@ -112,11 +148,19 @@ private fun HomeScreen(
     audio: AudioInfo?,
     state: UiState,
     activeModel: String?,
+    saved: SavedUi,
     onPickFile: () -> Unit,
     onCancel: () -> Unit,
     onOpenChooser: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onOpenSaved: (SavedTranscript) -> Unit,
+    onDismissSaved: () -> Unit,
 ) {
     val working = state is UiState.Decoding || state is UiState.Transcribing
+    val viewingSaved = state is UiState.Done && state.savedAt != null
+    // "Indietro" da un testo ripreso dalla cronologia torna alla schermata iniziale invece di uscire dall'app.
+    BackHandler(enabled = viewingSaved, onBack = onDismissSaved)
+
     Column(
         Modifier
             .fillMaxSize()
@@ -133,9 +177,32 @@ private fun HomeScreen(
                 onClick = onOpenChooser,
             )
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            Crossfade(targetState = audio == null && state is UiState.Idle, label = "content") { empty ->
-                if (empty) EmptyState() else Content(audio, state)
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val viewport = maxHeight
+            val idle = audio == null && state is UiState.Idle
+            val hasSaved = saved.recent.isNotEmpty()
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = viewport)
+                    .padding(horizontal = 20.dp),
+                // Senza testi salvati la presentazione sta al centro; altrimenti tutto parte dall'alto.
+                verticalArrangement = if (idle && !hasSaved) Arrangement.Center else Arrangement.spacedBy(14.dp),
+            ) {
+                Crossfade(targetState = idle, label = "content") { isIdle ->
+                    if (isIdle) Hero(smaller = hasSaved) else ResultBlocks(audio, state)
+                }
+                if (hasSaved) {
+                    RecentSection(
+                        items = saved.recent,
+                        total = saved.total,
+                        enabled = !working,
+                        onOpen = onOpenSaved,
+                        onSeeAll = onOpenHistory,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
             }
         }
         Column(
@@ -188,19 +255,19 @@ internal fun Header(trailing: (@Composable () -> Unit)? = null) {
     }
 }
 
+/** Presentazione iniziale; con testi salvati e' piu' piccola per lasciare posto all'elenco. */
 @Composable
-private fun EmptyState() {
+private fun Hero(smaller: Boolean) {
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 36.dp),
-        verticalArrangement = Arrangement.Center,
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Con lo schermo basso (orizzontale) il logo e' piu' piccolo, cosi' il testo resta visibile.
-        val compact = LocalConfiguration.current.screenHeightDp < 520
+        val shortScreen = LocalConfiguration.current.screenHeightDp < 520
         Image(
             painterResource(R.drawable.ic_launcher_foreground),
             contentDescription = null,
-            Modifier.size(if (compact) 72.dp else 168.dp),
+            Modifier.size(if (shortScreen) 72.dp else if (smaller) 104.dp else 168.dp),
         )
         Spacer(Modifier.height(8.dp))
         Text(
@@ -219,15 +286,10 @@ private fun EmptyState() {
     }
 }
 
+/** Scheda del file e testo: lo stesso per una trascrizione appena fatta e per una ripresa dalla cronologia. */
 @Composable
-private fun Content(audio: AudioInfo?, state: UiState) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+private fun ResultBlocks(audio: AudioInfo?, state: UiState) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         FileCard(audio?.name, statusText(state), state)
         when (state) {
             is UiState.Error -> MessageCard(stringResource(R.string.error, state.message), isError = true)
@@ -240,7 +302,6 @@ private fun Content(audio: AudioInfo?, state: UiState) {
             is UiState.Cancelled -> TranscriptCard(state.partialText, placeholder = stringResource(R.string.cancelled))
             is UiState.Done -> TranscriptCard(state.text, placeholder = stringResource(R.string.no_speech))
         }
-        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -254,7 +315,12 @@ private fun statusText(state: UiState): String = when (state) {
         } else {
             stringResource(R.string.status_transcribing_start)
         }
-    is UiState.Done -> stringResource(R.string.status_done, state.audioSeconds.toInt(), state.elapsedSeconds.toInt())
+    is UiState.Done ->
+        if (state.savedAt != null) {
+            stringResource(R.string.status_saved, state.audioSeconds.toInt(), formatTranscriptDate(state.savedAt))
+        } else {
+            stringResource(R.string.status_done, state.audioSeconds.toInt(), state.elapsedSeconds.toInt())
+        }
     is UiState.Cancelled -> stringResource(R.string.status_cancelled)
     UiState.ModelMissing, is UiState.Error -> ""
 }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -19,16 +20,51 @@ sealed interface UiState {
     data object Idle : UiState
     data object Decoding : UiState
     data class Transcribing(val progress: Float, val partialText: String) : UiState
-    data class Done(val text: String, val audioSeconds: Float, val elapsedSeconds: Float) : UiState
+    /** [savedAt] e' valorizzato quando il testo e' stato ripreso dalla cronologia invece che appena trascritto. */
+    data class Done(
+        val text: String,
+        val audioSeconds: Float,
+        val elapsedSeconds: Float,
+        val savedAt: Long? = null,
+    ) : UiState
     data class Cancelled(val partialText: String) : UiState
     data object ModelMissing : UiState
     data class Error(val message: String) : UiState
 }
 
+/** Schermata "Cronologia": testi caricati finora, a pagine, per lo scorrimento infinito. */
+data class HistoryUi(
+    val open: Boolean = false,
+    val items: List<SavedTranscript> = emptyList(),
+    val loading: Boolean = false,
+    val endReached: Boolean = false,
+)
+
 private const val TAG = "VocalizzApp"
+
+/** Quanti testi recenti restano sempre visibili nella schermata principale. */
+private const val RECENT_COUNT = 3
+
+/** Quanti testi si caricano alla volta nella cronologia completa. */
+private const val HISTORY_PAGE_SIZE = 10
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val modelManager = ModelManager(app)
+    private val store = TranscriptStore(app)
+
+    // Cronologia: gli ultimi testi (sempre visibili), il totale e la lista completa a pagine.
+    private val _recent = MutableStateFlow<List<SavedTranscript>>(emptyList())
+    val recent: StateFlow<List<SavedTranscript>> = _recent.asStateFlow()
+
+    private val _totalSaved = MutableStateFlow(0)
+    val totalSaved: StateFlow<Int> = _totalSaved.asStateFlow()
+
+    private val _history = MutableStateFlow(HistoryUi())
+    val history: StateFlow<HistoryUi> = _history.asStateFlow()
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) { loadRecent() }
+    }
 
     private val _audio = MutableStateFlow<AudioInfo?>(null)
     val audio: StateFlow<AudioInfo?> = _audio.asStateFlow()
@@ -79,6 +115,73 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun serviceFinished() {
         if (--activeJobs == 0) TranscriptionService.stop(getApplication())
+    }
+
+    // --- Cronologia -----------------------------------------------------------------------------
+
+    /** Da un thread in background. */
+    private fun loadRecent() {
+        _recent.value = store.latest(RECENT_COUNT)
+        _totalSaved.value = store.count()
+    }
+
+    private suspend fun saveTranscript(text: String, audioSeconds: Float) {
+        withContext(Dispatchers.IO) {
+            try {
+                store.insert(text, _audio.value?.name, audioSeconds)
+                loadRecent()
+            } catch (e: Exception) {
+                // Il testo si vede comunque: se il salvataggio fallisce non si perde il risultato.
+                // Si registra solo il tipo di errore, mai il contenuto.
+                Log.w(TAG, "Salvataggio nella cronologia non riuscito: ${e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    fun openHistory() {
+        _history.value = HistoryUi(open = true)
+        loadMoreHistory()
+    }
+
+    fun closeHistory() {
+        _history.value = HistoryUi()
+    }
+
+    /** Carica la pagina successiva (10 testi); non fa nulla se sta gia' caricando o non ce ne sono altri. */
+    fun loadMoreHistory() {
+        val current = _history.value
+        if (!current.open || current.loading || current.endReached) return
+        _history.value = current.copy(loading = true)
+        viewModelScope.launch(Dispatchers.IO) {
+            val page = try {
+                store.latest(HISTORY_PAGE_SIZE, beforeId = current.items.lastOrNull()?.id)
+            } catch (e: Exception) {
+                Log.w(TAG, "Lettura della cronologia non riuscita: ${e.javaClass.simpleName}")
+                _history.update { it.copy(loading = false, endReached = true) }
+                return@launch
+            }
+            _history.update {
+                it.copy(items = it.items + page, loading = false, endReached = page.size < HISTORY_PAGE_SIZE)
+            }
+        }
+    }
+
+    /** Mostra un testo salvato nella stessa vista del risultato di una trascrizione appena fatta. */
+    fun viewSaved(item: SavedTranscript) {
+        val s = _state.value
+        if (s is UiState.Decoding || s is UiState.Transcribing) return // non interrompere un lavoro in corso
+        _audio.value = AudioInfo(Uri.EMPTY, item.sourceName, null, null)
+        _state.value = UiState.Done(item.text, item.audioSeconds, 0f, savedAt = item.createdAtMillis)
+        _history.value = HistoryUi()
+    }
+
+    /** Chiude la vista di un testo ripreso dalla cronologia e torna alla schermata iniziale. */
+    fun dismissSaved() {
+        val s = _state.value
+        if (s is UiState.Done && s.savedAt != null) {
+            _state.value = UiState.Idle
+            _audio.value = null
+        }
     }
 
     private fun refreshModels() {
@@ -166,6 +269,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** [modelName]: modello da usare solo per questa trascrizione (test da adb); di norma quello scelto. */
     fun onAudioReceived(uri: Uri, modelName: String? = null) {
         _audio.value = readAudioInfo(getApplication(), uri)
+        _history.value = HistoryUi() // un nuovo vocale ha la precedenza sulla cronologia aperta
         job?.cancel()
         job = viewModelScope.launch {
             var started = false
@@ -199,6 +303,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val t3 = SystemClock.elapsedRealtime()
                 Log.i(TAG, "model=${model.name} audio=${audioSeconds}s decode=${t1 - t0}ms load=${t2 - t1}ms transcribe=${t3 - t2}ms")
+                if (text.isNotBlank()) saveTranscript(text, audioSeconds)
                 _state.value = UiState.Done(text, audioSeconds, (t3 - t1) / 1000f)
             } catch (e: CancellationException) {
                 throw e

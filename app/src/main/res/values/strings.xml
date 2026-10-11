@@ -16,7 +16,11 @@
     <string name="status_transcribing_start">Trascrizione in corso…</string>
     <string name="status_transcribing">Trascrizione in corso · %1$d%%</string>
     <string name="status_done">%1$d s di audio · trascritto in %2$d s</string>
+    <string name="status_saved">%1$d s di audio · %2$s</string>
     <string name="status_cancelled">Interrotta</string>
+    <string name="recent_title">Recenti</string>
+    <string name="see_all">Vedi tutti</string>
+    <string name="history_title">Cronologia</string>
     <string name="placeholder">Il testo comparirà qui man mano che viene trascritto.</string>
     <string name="cancelled">Nessun testo ottenuto prima dell\'interruzione.</string>
     <string name="no_speech">Nessun parlato riconosciuto.</string>

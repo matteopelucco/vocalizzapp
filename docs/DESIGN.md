@@ -118,3 +118,12 @@ Conclusioni:
 - Sorgente dei numeri: `version.properties`. Ogni build che firma (`assembleRelease`, `bundleRelease`, `installRelease`) usa i valori del file e poi incrementa `patch` e `code` (`versionCode`, necessario ad Android per riconoscere un aggiornamento). `major`/`minor` solo su richiesta dell'utente. Il rilevamento della firma si basa sui nomi dei task richiesti (`gradle.startParameter.taskNames`): una build avviata da IDE con "Generate Signed APK" usa gli stessi task.
 - Build di sviluppo: versione con suffisso `-dev`, file invariato.
 - Limite noto: se una build di release fallisce dopo l'incremento, il numero resta "consumato" (accettabile: i numeri non devono essere consecutivi).
+
+## 16. Cronologia dei testi
+- **Richiesta**: i testi trascritti restano in memoria sul telefono per poterli riprendere; gli ultimi 3 sempre visibili, poi "Vedi tutti" con caricamento a 10 a 10 (scorrimento infinito). Ogni voce: prima riga di testo, ellissi, data e ora ai minuti. Toccandola si vede tutto il testo, nella stessa vista del risultato di una condivisione.
+- **Archiviazione**: SQLite privato dell'app, tabella `transcripts` (`id`, `text`, `created_at`, `source_name`, `audio_seconds`), via `SQLiteOpenHelper` (nessuna nuova dipendenza). Non cifrato; non nei backup; non leggibile da altre app.
+- **Paginazione**: a cursore (`WHERE id < ? ORDER BY id DESC LIMIT n`) invece di OFFSET: resta corretta anche se arrivano nuovi testi mentre si scorre. Il caricamento della pagina successiva parte quando mancano ≤ 3 elementi al fondo.
+- **Vista del dettaglio**: un testo salvato viene caricato come `UiState.Done` con `savedAt`; la scheda del file mostra "N s di audio · data e ora" al posto del tempo di trascrizione. "Indietro" torna alla schermata iniziale. Non si può aprire un testo mentre una trascrizione è in corso.
+- **Salvataggio**: alla fine di una trascrizione completata e non vuota; se fallisce il testo si vede comunque. Nei log solo il tipo di errore, mai il testo.
+- **Verifica** (ottobre 2026, POCO X6 Pro): 13 trascrizioni salvate, schermata iniziale con 3 voci + "Vedi tutti", dati presenti dopo la chiusura e la riapertura dell'app. Test automatici sul formato di data e sull'anteprima. Da verificare a mano: tocco su una voce, schermata "Cronologia", scorrimento oltre le prime 10 voci.
+- **Possibili sviluppi** (non richiesti): eliminare un testo o svuotare la cronologia; ricerca; cifratura.

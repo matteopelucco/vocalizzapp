@@ -14,6 +14,7 @@ Non aggiungere funzionalità fuori scopo (no chat, no account, no cloud, no anal
 - **Decodifica audio**: `MediaExtractor` + `MediaCodec` (Opus/OGG, m4a, mp3...) → PCM 16 kHz mono float. Nessun ffmpeg.
 - **Modello esternalizzato (decisione utente)**: il modello Whisper NON va nell'APK, così può essere aggiornato/sostituito senza reinstallare l'app. Vive in `getExternalFilesDir("models")/` come terna `<nome>-encoder.int8.onnx`, `<nome>-decoder.int8.onnx`, `<nome>-tokens.txt`. `ModelManager` lo individua a runtime; se manca, l'app mostra la scelta e scarica in-app (`ModelDownloader`, da Hugging Face `csukuangfj/sherpa-onnx-whisper-<nome>`, con ripresa e verifica delle dimensioni). In sviluppo si può anche usare `adb push`, ma la cartella `models` deve essere creata dall'app (vedi DESIGN.md §9).
 - **Scelta del modello (decisione utente)**: al primo avvio l'utente sceglie cosa scaricare tra `base` (Veloce, 161 MB), `small` (Equilibrato, 375 MB, consigliato) e `turbo` (Preciso, 1,0 GB); poi può cambiare, scaricarne altri o eliminarli. Il catalogo è in `ModelCatalog.kt` (file, dimensioni esatte, precisione e velocità misurate, RAM minima) e la scheda avvisa se RAM o spazio sono al limite. Per aggiungere un modello: nuova voce nel catalogo + stringhe in `strings.xml` + benchmark in `docs/DESIGN.md`.
+- **Cronologia (decisione utente)**: i testi trascritti restano sul telefono, in SQLite privato (`TranscriptStore`, `transcripts.db`) con il `SQLiteOpenHelper` di Android: nessuna libreria (niente Room), perché serve una sola tabella. Schermata iniziale: gli ultimi 3 sempre visibili + "Vedi tutti" (schermata `HistoryScreen`, 10 alla volta con scorrimento infinito, paginazione a cursore sull'id). Una riga = prima riga del testo con ellissi + data/ora ai minuti. Toccare un testo lo mostra nella stessa vista del risultato (`UiState.Done` con `savedAt`). Salvati solo i testi completati e non vuoti. **Mai scrivere il contenuto dei testi nei log.** Se serve cambiare lo schema: incrementare `DB_VERSION` e scrivere la migrazione in `onUpgrade`.
 - **Servizio in primo piano**: `TranscriptionService` non fa lavoro, serve solo a evitare che HyperOS rallenti la CPU in background (48 s → 16 s su 44 s di audio). Parte con ogni trascrizione/download.
 - **Privacy**: l'audio non lascia mai il dispositivo. Il permesso INTERNET serve solo per scaricare/aggiornare il modello; mai per inviare audio o testo.
 - minSdk 26, **targetSdk/compileSdk 36** (Android 16), package `com.matteopelucco.vocalizzapp`. Strumenti: AGP 8.13.2, Gradle 8.14.6, Kotlin 2.3.21 (le versioni 9.x di AGP/Gradle e Kotlin 2.4 hanno cambiamenti incompatibili: aggiornare solo con un test dedicato).
@@ -53,7 +54,9 @@ app/src/main/java/com/matteopelucco/vocalizzapp/
   ModelManager.kt          # modelli installati, modello in uso (SharedPreferences), RAM/spazio, eliminazione
   ModelDownloader.kt       # download del modello con ripresa
   TranscriptionService.kt  # servizio in primo piano anti-throttling
-  ui/Theme.kt, MainScreen.kt, ModelChooser.kt, Icons.kt
+  TranscriptStore.kt       # cronologia dei testi (SQLite privato, paginazione a cursore)
+  TranscriptFormat.kt      # data "10 ott 2026, 21:34" e anteprima su una riga
+  ui/Theme.kt, MainScreen.kt, ModelChooser.kt, History.kt, Icons.kt
 app/src/main/java/com/k2fsa/sherpa/onnx/   # API Kotlin ufficiale di sherpa-onnx (NON rinominare: JNI)
 docs/DESIGN.md             # progettazione, benchmark, roadmap
 scripts/setup-sherpa.ps1

@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.matteopelucco.vocalizzapp.ui.MainScreen
 import com.matteopelucco.vocalizzapp.ui.ModelsUi
+import com.matteopelucco.vocalizzapp.ui.SavedUi
 import com.matteopelucco.vocalizzapp.ui.VocalizzAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -35,6 +36,9 @@ class MainActivity : ComponentActivity() {
                 val device by viewModel.device.collectAsState()
                 val download by viewModel.download.collectAsState()
                 val chooserOpen by viewModel.chooserOpen.collectAsState()
+                val recent by viewModel.recent.collectAsState()
+                val totalSaved by viewModel.totalSaved.collectAsState()
+                val history by viewModel.history.collectAsState()
                 val picker = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent()
                 ) { uri -> uri?.let(viewModel::onAudioReceived) }
@@ -50,6 +54,7 @@ class MainActivity : ComponentActivity() {
                         busy = state is UiState.Decoding || state is UiState.Transcribing,
                     ),
                     chooserOpen = chooserOpen,
+                    saved = SavedUi(recent = recent, total = totalSaved, history = history),
                     onPickFile = { picker.launch("audio/*") },
                     onCancel = viewModel::cancel,
                     onOpenChooser = viewModel::openChooser,
@@ -58,6 +63,11 @@ class MainActivity : ComponentActivity() {
                     onUseModel = viewModel::selectModel,
                     onDeleteModel = viewModel::deleteModel,
                     onCancelDownload = viewModel::cancelDownload,
+                    onOpenHistory = viewModel::openHistory,
+                    onCloseHistory = viewModel::closeHistory,
+                    onLoadMoreHistory = viewModel::loadMoreHistory,
+                    onOpenSaved = viewModel::viewSaved,
+                    onDismissSaved = viewModel::dismissSaved,
                 )
             }
         }
