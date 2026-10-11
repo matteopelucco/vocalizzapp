@@ -120,10 +120,28 @@ Conclusioni:
 - Limite noto: se una build di release fallisce dopo l'incremento, il numero resta "consumato" (accettabile: i numeri non devono essere consecutivi).
 
 ## 16. Cronologia dei testi
-- **Richiesta**: i testi trascritti restano in memoria sul telefono per poterli riprendere; gli ultimi 3 sempre visibili, poi "Vedi tutti" con caricamento a 10 a 10 (scorrimento infinito). Ogni voce: prima riga di testo, ellissi, data e ora ai minuti. Toccandola si vede tutto il testo, nella stessa vista del risultato di una condivisione.
+- **Richiesta**: i testi trascritti restano in memoria sul telefono per poterli riprendere; gli ultimi 3 sempre visibili, poi "Vedi tutti" con caricamento a 10 a 10 (scorrimento infinito). Ogni voce: prima riga di testo, ellissi, data e ora ai minuti. Toccandola si vede tutto il testo (in origine come vista separata; vedi 16.2: ora la card si apre sul posto).
 - **Archiviazione**: SQLite privato dell'app, tabella `transcripts` (`id`, `text`, `created_at`, `source_name`, `audio_seconds`), via `SQLiteOpenHelper` (nessuna nuova dipendenza). Non cifrato; non nei backup; non leggibile da altre app.
 - **Paginazione**: a cursore (`WHERE id < ? ORDER BY id DESC LIMIT n`) invece di OFFSET: resta corretta anche se arrivano nuovi testi mentre si scorre. Il caricamento della pagina successiva parte quando mancano ≤ 3 elementi al fondo.
-- **Vista del dettaglio**: un testo salvato viene caricato come `UiState.Done` con `savedAt`; la scheda del file mostra "N s di audio · data e ora" al posto del tempo di trascrizione. "Indietro" torna alla schermata iniziale. Non si può aprire un testo mentre una trascrizione è in corso.
+- **Vista del testo**: la card si apre sul posto (vedi 16.2). Un testo salvato non passa piu' dallo stato `UiState.Done`: lo mostra la card stessa.
 - **Salvataggio**: alla fine di una trascrizione completata e non vuota; se fallisce il testo si vede comunque. Nei log solo il tipo di errore, mai il testo.
 - **Verifica** (ottobre 2026, POCO X6 Pro): 13 trascrizioni salvate, schermata iniziale con 3 voci + "Vedi tutti", dati presenti dopo la chiusura e la riapertura dell'app. Test automatici sul formato di data e sull'anteprima. Da verificare a mano: tocco su una voce, schermata "Cronologia", scorrimento oltre le prime 10 voci.
 - **Possibili sviluppi** (non richiesti): eliminare un testo o svuotare la cronologia; ricerca; cifratura.
+
+### 16.1 Eliminazione dei testi
+- **Richiesta**: cancellazione di un singolo testo e di tutta la cronologia, con conferma.
+- **Singola**: cestino su ogni riga (schermata iniziale e "Cronologia") e pulsante "Elimina" nella card aperta e nel risultato di una trascrizione appena fatta (che e' gia' salvata). Conferma con anteprima delle prime parole.
+- **Totale**: "Elimina tutto" nell'intestazione di "Recenti" e della schermata "Cronologia" (cosi' e' raggiungibile anche con meno di 4 testi). La conferma indica quanti testi verranno eliminati (plurale gestito).
+- **Dopo l'eliminazione**: se il testo eliminato era quello mostrato, si torna alla schermata iniziale; dopo "Elimina tutto" si chiude anche l'elenco. Le liste si aggiornano da sole e la paginazione a cursore resta valida.
+- **Privacy**: `PRAGMA secure_delete = ON` (SQLite sovrascrive con zeri il contenuto cancellato) e `VACUUM` dopo "Elimina tutto". Senza queste misure il testo eliminato resterebbe leggibile nel file finche' lo spazio non viene riusato.
+- **Verifica** (ottobre 2026): compilazione e test ok; sul telefono la schermata mostra cestini e "Elimina tutto" e i dati esistenti sono intatti. **Da provare a mano**: le finestre di conferma e le eliminazioni (non si puo' toccare lo schermo da PC).
+
+### 16.2 Card che si apre sul posto
+- **Problema**: toccare un testo lo mostrava come se arrivasse da una condivisione esterna (stessa vista del risultato). La navigazione disorientava l'utente.
+- **Soluzione (decisione utente)**: la card si **espande sul posto** e si richiude, sia nei 3 recenti sia nell'elenco completo. Nessuna schermata nuova, nessun cambio di stato dell'app.
+- **Comportamento**: chiusa = prima riga con puntini, data e cestino; aperta = durata e data in intestazione con freccia, testo intero (selezionabile) e le azioni Elimina, Condividi, Copia. Si richiude toccando l'intestazione. Una sola card aperta alla volta per elenco (`expandedId`, conservato anche alla rotazione); l'apertura e' animata (`animateContentSize`). Toccare il testo aperto non richiude (serve per selezionarlo).
+- **Codice**: `TranscriptRow(item, expanded, onToggle, onDelete)` in `ui/History.kt`; rimossi `viewSaved`, `dismissSaved` e il campo `savedAt` di `UiState.Done`.
+- **Verifica** (ottobre 2026): su una build temporanea con la prima card aperta (poi rimossa) la card aperta e' stata controllata con uno screenshot sul POCO X6 Pro; le card chiuse nella build finale pure. Il tocco di apertura/chiusura va provato a mano.
+
+## 17. Versione 0.2.0
+Su richiesta dell'utente la prossima versione firmata dopo la 0.1.x e' la **0.2.0** (`minor` portato a 2 e `patch` a 0 in `version.properties`). Da qui `patch` riprende a salire a ogni firma; `major` resta a 0.

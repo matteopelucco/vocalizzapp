@@ -66,8 +66,8 @@ class MainActivity : ComponentActivity() {
                     onOpenHistory = viewModel::openHistory,
                     onCloseHistory = viewModel::closeHistory,
                     onLoadMoreHistory = viewModel::loadMoreHistory,
-                    onOpenSaved = viewModel::viewSaved,
-                    onDismissSaved = viewModel::dismissSaved,
+                    onDeleteSaved = viewModel::deleteTranscript,
+                    onDeleteAllSaved = viewModel::deleteAllTranscripts,
                 )
             }
         }

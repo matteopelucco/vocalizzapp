@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.Intent
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.heightIn
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -72,9 +71,7 @@ import com.matteopelucco.vocalizzapp.AudioInfo
 import com.matteopelucco.vocalizzapp.BuildConfig
 import com.matteopelucco.vocalizzapp.ModelCatalog
 import com.matteopelucco.vocalizzapp.R
-import com.matteopelucco.vocalizzapp.SavedTranscript
 import com.matteopelucco.vocalizzapp.UiState
-import com.matteopelucco.vocalizzapp.formatTranscriptDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -98,8 +95,8 @@ fun MainScreen(
     onOpenHistory: () -> Unit,
     onCloseHistory: () -> Unit,
     onLoadMoreHistory: () -> Unit,
-    onOpenSaved: (SavedTranscript) -> Unit,
-    onDismissSaved: () -> Unit,
+    onDeleteSaved: (Long) -> Unit,
+    onDeleteAllSaved: () -> Unit,
 ) {
     // Senza alcun modello l'app non puo' lavorare: la scelta del modello diventa la prima schermata.
     val firstRun = models.installed.isEmpty()
@@ -108,7 +105,6 @@ fun MainScreen(
         saved.history.open -> Screen.History
         else -> Screen.Home
     }
-    val working = state is UiState.Decoding || state is UiState.Transcribing
     Crossfade(targetState = screen, label = "screen") { current ->
         when (current) {
             Screen.Chooser -> ModelChooserScreen(
@@ -122,10 +118,11 @@ fun MainScreen(
             )
             Screen.History -> HistoryScreen(
                 history = saved.history,
-                enabled = !working,
+                total = saved.total,
                 onBack = onCloseHistory,
                 onLoadMore = onLoadMoreHistory,
-                onOpen = onOpenSaved,
+                onDeleteItem = onDeleteSaved,
+                onDeleteAll = onDeleteAllSaved,
             )
             Screen.Home -> HomeScreen(
                 audio = audio,
@@ -136,8 +133,8 @@ fun MainScreen(
                 onCancel = onCancel,
                 onOpenChooser = onOpenChooser,
                 onOpenHistory = onOpenHistory,
-                onOpenSaved = onOpenSaved,
-                onDismissSaved = onDismissSaved,
+                onDeleteSaved = onDeleteSaved,
+                onDeleteAllSaved = onDeleteAllSaved,
             )
         }
     }
@@ -153,13 +150,10 @@ private fun HomeScreen(
     onCancel: () -> Unit,
     onOpenChooser: () -> Unit,
     onOpenHistory: () -> Unit,
-    onOpenSaved: (SavedTranscript) -> Unit,
-    onDismissSaved: () -> Unit,
+    onDeleteSaved: (Long) -> Unit,
+    onDeleteAllSaved: () -> Unit,
 ) {
     val working = state is UiState.Decoding || state is UiState.Transcribing
-    val viewingSaved = state is UiState.Done && state.savedAt != null
-    // "Indietro" da un testo ripreso dalla cronologia torna alla schermata iniziale invece di uscire dall'app.
-    BackHandler(enabled = viewingSaved, onBack = onDismissSaved)
 
     Column(
         Modifier
@@ -191,15 +185,15 @@ private fun HomeScreen(
                 verticalArrangement = if (idle && !hasSaved) Arrangement.Center else Arrangement.spacedBy(14.dp),
             ) {
                 Crossfade(targetState = idle, label = "content") { isIdle ->
-                    if (isIdle) Hero(smaller = hasSaved) else ResultBlocks(audio, state)
+                    if (isIdle) Hero(smaller = hasSaved) else ResultBlocks(audio, state, onDeleteSaved)
                 }
                 if (hasSaved) {
                     RecentSection(
                         items = saved.recent,
                         total = saved.total,
-                        enabled = !working,
-                        onOpen = onOpenSaved,
                         onSeeAll = onOpenHistory,
+                        onDeleteItem = onDeleteSaved,
+                        onDeleteAll = onDeleteAllSaved,
                     )
                 }
                 Spacer(Modifier.height(8.dp))
@@ -288,7 +282,7 @@ private fun Hero(smaller: Boolean) {
 
 /** Scheda del file e testo: lo stesso per una trascrizione appena fatta e per una ripresa dalla cronologia. */
 @Composable
-private fun ResultBlocks(audio: AudioInfo?, state: UiState) {
+private fun ResultBlocks(audio: AudioInfo?, state: UiState, onDeleteResult: (Long) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         FileCard(audio?.name, statusText(state), state)
         when (state) {
@@ -300,7 +294,11 @@ private fun ResultBlocks(audio: AudioInfo?, state: UiState) {
                 inProgress = true,
             )
             is UiState.Cancelled -> TranscriptCard(state.partialText, placeholder = stringResource(R.string.cancelled))
-            is UiState.Done -> TranscriptCard(state.text, placeholder = stringResource(R.string.no_speech))
+            is UiState.Done -> TranscriptCard(
+                state.text,
+                placeholder = stringResource(R.string.no_speech),
+                onDelete = state.savedId?.let { id -> { onDeleteResult(id) } },
+            )
         }
     }
 }
@@ -315,12 +313,7 @@ private fun statusText(state: UiState): String = when (state) {
         } else {
             stringResource(R.string.status_transcribing_start)
         }
-    is UiState.Done ->
-        if (state.savedAt != null) {
-            stringResource(R.string.status_saved, state.audioSeconds.toInt(), formatTranscriptDate(state.savedAt))
-        } else {
-            stringResource(R.string.status_done, state.audioSeconds.toInt(), state.elapsedSeconds.toInt())
-        }
+    is UiState.Done -> stringResource(R.string.status_done, state.audioSeconds.toInt(), state.elapsedSeconds.toInt())
     is UiState.Cancelled -> stringResource(R.string.status_cancelled)
     UiState.ModelMissing, is UiState.Error -> ""
 }
@@ -425,7 +418,12 @@ private fun WaveBar(height: Dp) {
 }
 
 @Composable
-private fun TranscriptCard(text: String, placeholder: String, inProgress: Boolean = false) {
+private fun TranscriptCard(
+    text: String,
+    placeholder: String,
+    inProgress: Boolean = false,
+    onDelete: (() -> Unit)? = null,
+) {
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
@@ -445,6 +443,7 @@ private fun TranscriptCard(text: String, placeholder: String, inProgress: Boolea
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 ) {
+                    if (onDelete != null) DeleteButton(text, onDelete)
                     ShareButton(text)
                     CopyButton(text)
                 }
@@ -500,7 +499,7 @@ private fun TypingDots() {
 
 /** Copia il testo negli appunti; per un attimo conferma con "Copiato". */
 @Composable
-private fun CopyButton(text: String) {
+internal fun CopyButton(text: String) {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val label = stringResource(R.string.app_name)
@@ -521,9 +520,27 @@ private fun CopyButton(text: String) {
     }
 }
 
+/** Elimina questo testo dalla cronologia, dopo una conferma. */
+@Composable
+private fun DeleteButton(text: String, onConfirmed: () -> Unit) {
+    var asking by remember { mutableStateOf(false) }
+    ActionPill(icon = TrashIcon, label = stringResource(R.string.delete), highlighted = false) { asking = true }
+    if (asking) {
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.delete_text_title),
+            text = stringResource(R.string.delete_text_body, previewForDialog(text)),
+            onConfirm = {
+                asking = false
+                onConfirmed()
+            },
+            onDismiss = { asking = false },
+        )
+    }
+}
+
 /** Invia il testo a un'altra app (es. una chat) tramite il selettore di Android. */
 @Composable
-private fun ShareButton(text: String) {
+internal fun ShareButton(text: String) {
     val context = LocalContext.current
     val title = stringResource(R.string.share)
     ActionPill(icon = ShareIcon, label = title, highlighted = false) {

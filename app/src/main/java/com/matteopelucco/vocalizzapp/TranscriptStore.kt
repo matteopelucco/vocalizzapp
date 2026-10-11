@@ -27,6 +27,17 @@ data class SavedTranscript(
 class TranscriptStore(context: Context) :
     SQLiteOpenHelper(context.applicationContext, DB_NAME, null, DB_VERSION) {
 
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        // Con "secure_delete" SQLite sovrascrive con zeri il contenuto cancellato: senza, il testo
+        // eliminato resterebbe leggibile nel file finche' lo spazio non viene riutilizzato.
+        try {
+            db.execSQL("PRAGMA secure_delete = ON")
+        } catch (_: Exception) {
+            // Se non e' disponibile, deleteAll() compatta comunque il file con VACUUM.
+        }
+    }
+
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE $TABLE (" +
@@ -74,6 +85,20 @@ class TranscriptStore(context: Context) :
             }
         }
         return result
+    }
+
+    /** Elimina un testo. Restituisce vero se esisteva. */
+    fun delete(id: Long): Boolean = writableDatabase.delete(TABLE, "id = ?", arrayOf(id.toString())) > 0
+
+    /** Elimina tutti i testi e compatta il file del database, cosi' non ne resta traccia. */
+    fun deleteAll(): Int {
+        val deleted = writableDatabase.delete(TABLE, null, null)
+        try {
+            writableDatabase.execSQL("VACUUM")
+        } catch (_: Exception) {
+            // Facoltativo: i testi sono gia' cancellati e, con secure_delete, sovrascritti.
+        }
+        return deleted
     }
 
     fun count(): Int =

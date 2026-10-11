@@ -11,7 +11,7 @@ Condividi un vocale con VocalizzApp e dopo pochi secondi leggi cosa dice. Poi lo
 - **Veloce**: con il modello *Equilibrato* circa 16 secondi per 44 secondi di audio su un POCO X6 Pro; un vocale da 10 secondi richiede pochi secondi.
 - **Testo progressivo**: i vocali lunghi sono divisi nei punti di silenzio e il testo compare man mano, con un'animazione che mostra che il lavoro è in corso. Si può annullare.
 - **Copia e condividi** il testo con un tocco.
-- **Cronologia**: i testi trascritti restano salvati sul telefono. Nella schermata iniziale vedi gli ultimi 3 (prima riga e data); con **Vedi tutti** scorri l'elenco completo, caricato a 10 alla volta. Toccando un testo lo rivedi per intero, con Copia e Condividi.
+- **Cronologia**: i testi trascritti restano salvati sul telefono. Nella schermata iniziale vedi gli ultimi 3 (prima riga e data); con **Vedi tutti** scorri l'elenco completo, caricato a 10 alla volta. Toccando un testo la sua card **si apre sul posto** e mostra il testo intero, con Elimina, Condividi e Copia; toccando di nuovo l'intestazione si richiude (una sola card aperta alla volta). Puoi **eliminare un testo** (cestino accanto alla voce, o "Elimina" nella card aperta) oppure **tutta la cronologia** ("Elimina tutto"): in entrambi i casi l'app chiede prima una conferma.
 - **Continua in background**: un servizio in primo piano evita che Android rallenti la trascrizione se esci dall'app o blocchi lo schermo.
 - Tema chiaro e scuro, in italiano.
 
@@ -191,7 +191,7 @@ Se sul telefono c'è già la versione di sviluppo (firma diversa) devi prima dis
 
 ## La cronologia dei testi
 
-- I testi trascritti sono salvati in un database privato dell'app (`transcripts.db`), che nessun'altra app può leggere e che non finisce nei backup. Non lasciano mai il telefono. **Non sono cifrati**: chi ha accesso al telefono sbloccato può leggerli dall'app. Disinstallare l'app li cancella.
+- I testi trascritti sono salvati in un database privato dell'app (`transcripts.db`), che nessun'altra app può leggere e che non finisce nei backup. Non lasciano mai il telefono. **Non sono cifrati**: chi ha accesso al telefono sbloccato può leggerli dall'app. Disinstallare l'app li cancella. Quando elimini un testo il suo contenuto viene anche sovrascritto nel file del database (e con "Elimina tutto" il file viene compattato), quindi non resta traccia recuperabile.
 - Si salvano solo le trascrizioni completate; quelle interrotte o senza parlato no.
 - Ogni riga mostra la prima riga del testo, i puntini di sospensione se continua, e data e ora della trascrizione (ai minuti).
 

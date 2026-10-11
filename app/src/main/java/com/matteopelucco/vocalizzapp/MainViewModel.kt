@@ -20,12 +20,12 @@ sealed interface UiState {
     data object Idle : UiState
     data object Decoding : UiState
     data class Transcribing(val progress: Float, val partialText: String) : UiState
-    /** [savedAt] e' valorizzato quando il testo e' stato ripreso dalla cronologia invece che appena trascritto. */
     data class Done(
         val text: String,
         val audioSeconds: Float,
         val elapsedSeconds: Float,
-        val savedAt: Long? = null,
+        /** Id del testo nella cronologia, se il salvataggio e' riuscito. */
+        val savedId: Long? = null,
     ) : UiState
     data class Cancelled(val partialText: String) : UiState
     data object ModelMissing : UiState
@@ -125,18 +125,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _totalSaved.value = store.count()
     }
 
-    private suspend fun saveTranscript(text: String, audioSeconds: Float) {
+    /** Salva il testo e ne restituisce l'id, o null se il salvataggio non e' riuscito. */
+    private suspend fun saveTranscript(text: String, audioSeconds: Float): Long? =
         withContext(Dispatchers.IO) {
             try {
-                store.insert(text, _audio.value?.name, audioSeconds)
-                loadRecent()
+                store.insert(text, _audio.value?.name, audioSeconds).also { loadRecent() }
             } catch (e: Exception) {
                 // Il testo si vede comunque: se il salvataggio fallisce non si perde il risultato.
                 // Si registra solo il tipo di errore, mai il contenuto.
                 Log.w(TAG, "Salvataggio nella cronologia non riuscito: ${e.javaClass.simpleName}")
+                null
             }
         }
-    }
 
     fun openHistory() {
         _history.value = HistoryUi(open = true)
@@ -166,19 +166,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Mostra un testo salvato nella stessa vista del risultato di una trascrizione appena fatta. */
-    fun viewSaved(item: SavedTranscript) {
-        val s = _state.value
-        if (s is UiState.Decoding || s is UiState.Transcribing) return // non interrompere un lavoro in corso
-        _audio.value = AudioInfo(Uri.EMPTY, item.sourceName, null, null)
-        _state.value = UiState.Done(item.text, item.audioSeconds, 0f, savedAt = item.createdAtMillis)
-        _history.value = HistoryUi()
+    /** Elimina un testo dalla cronologia; se e' quello mostrato, torna alla schermata iniziale. */
+    fun deleteTranscript(id: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                store.delete(id)
+            } catch (e: Exception) {
+                Log.w(TAG, "Eliminazione non riuscita: ${e.javaClass.simpleName}")
+                return@launch
+            }
+            loadRecent()
+            _history.update { h -> h.copy(items = h.items.filterNot { it.id == id }) }
+            clearResultIf { it.savedId == id }
+        }
     }
 
-    /** Chiude la vista di un testo ripreso dalla cronologia e torna alla schermata iniziale. */
-    fun dismissSaved() {
+    /** Elimina tutta la cronologia e chiude la schermata dell'elenco. */
+    fun deleteAllTranscripts() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                store.deleteAll()
+            } catch (e: Exception) {
+                Log.w(TAG, "Eliminazione non riuscita: ${e.javaClass.simpleName}")
+                return@launch
+            }
+            loadRecent()
+            _history.value = HistoryUi()
+            clearResultIf { it.savedId != null }
+        }
+    }
+
+    /** Se il risultato mostrato e' un testo salvato che soddisfa [matches], lo toglie dallo schermo. */
+    private fun clearResultIf(matches: (UiState.Done) -> Boolean) {
         val s = _state.value
-        if (s is UiState.Done && s.savedAt != null) {
+        if (s is UiState.Done && matches(s)) {
             _state.value = UiState.Idle
             _audio.value = null
         }
@@ -303,8 +324,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val t3 = SystemClock.elapsedRealtime()
                 Log.i(TAG, "model=${model.name} audio=${audioSeconds}s decode=${t1 - t0}ms load=${t2 - t1}ms transcribe=${t3 - t2}ms")
-                if (text.isNotBlank()) saveTranscript(text, audioSeconds)
-                _state.value = UiState.Done(text, audioSeconds, (t3 - t1) / 1000f)
+                val savedId = if (text.isNotBlank()) saveTranscript(text, audioSeconds) else null
+                _state.value = UiState.Done(text, audioSeconds, (t3 - t1) / 1000f, savedId = savedId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

@@ -18,6 +18,17 @@
     <string name="status_done">%1$d s di audio · trascritto in %2$d s</string>
     <string name="status_saved">%1$d s di audio · %2$s</string>
     <string name="status_cancelled">Interrotta</string>
+    <string name="delete_all">Elimina tutto</string>
+    <string name="delete_all_title">Eliminare tutta la cronologia?</string>
+    <string name="delete_all_confirm">Elimina tutto</string>
+    <plurals name="delete_all_body">
+        <item quantity="one">Verrà eliminato l\'unico testo salvato. Non potrai recuperarlo.</item>
+        <item quantity="other">Verranno eliminati tutti i %1$d testi salvati. Non potrai recuperarli.</item>
+    </plurals>
+    <string name="delete_text_title">Eliminare questo testo?</string>
+    <string name="delete_text_body">«%1$s»\n\nVerrà eliminato dal telefono e non potrai recuperarlo.</string>
+    <string name="delete_text_desc">Elimina questo testo</string>
+    <string name="collapse">Chiudi</string>
     <string name="recent_title">Recenti</string>
     <string name="see_all">Vedi tutti</string>
     <string name="history_title">Cronologia</string>
