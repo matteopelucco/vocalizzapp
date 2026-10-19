@@ -4,6 +4,7 @@ import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
@@ -19,16 +20,22 @@ class Transcriber(model: WhisperModel, language: String = "it") : AutoCloseable 
         config = OfflineRecognizerConfig(
             featConfig = FeatureConfig(sampleRate = AudioDecoder.TARGET_RATE, featureDim = 80),
             modelConfig = OfflineModelConfig(
-                whisper = OfflineWhisperModelConfig(
+                // Parakeet (transducer NeMo) e' multilingua con rilevamento automatico: niente lingua da impostare.
+                whisper = if (model.joiner != null) OfflineWhisperModelConfig() else OfflineWhisperModelConfig(
                     encoder = model.encoder.absolutePath,
                     decoder = model.decoder.absolutePath,
                     language = language,
                     task = "transcribe",
                 ),
+                transducer = if (model.joiner == null) OfflineTransducerModelConfig() else OfflineTransducerModelConfig(
+                    encoder = model.encoder.absolutePath,
+                    decoder = model.decoder.absolutePath,
+                    joiner = model.joiner.absolutePath,
+                ),
                 tokens = model.tokens.absolutePath,
-                numThreads = 4,
+                numThreads = 3,
                 provider = "cpu",
-                modelType = "whisper",
+                modelType = if (model.joiner != null) "nemo_transducer" else "whisper",
             ),
             decodingMethod = "greedy_search",
         ),

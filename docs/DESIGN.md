@@ -145,3 +145,9 @@ Conclusioni:
 
 ## 17. Versione 0.2.0
 Su richiesta dell'utente la prossima versione firmata dopo la 0.1.x e' la **0.2.0** (`minor` portato a 2 e `patch` a 0 in `version.properties`). Da qui `patch` riprende a salire a ogni firma; `major` resta a 0.
+
+
+## 15. Parakeet TDT 0.6B v3 (quarto modello, ottobre 2026)
+- Modello NVIDIA transducer (NeMo), multilingua con rilevamento automatico della lingua, punteggiatura e maiuscole incluse. Repo `csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` (encoder 652 MB + decoder 12 MB + joiner 6 MB, ~0,7 GB). In sherpa-onnx: `OfflineTransducerModelConfig` + `modelType = "nemo_transducer"`. File locali con prefisso `parakeet-`; il repo non lo usa, quindi `ModelFile.remoteName`.
+- **Benchmark** (POCO X6 Pro, 3 thread, voce sintetica italiana di 33 s): `parakeet` **2,2 s** (caricamento 2,5-3,5 s una tantum) contro `turbo` **21 s**: circa 10 volte piu' veloce, ~15x il tempo reale. Testo corretto, con punteggiatura. Da confermare con vocali reali (rumore, accenti, parlato veloce) prima di renderlo il consigliato.
+- Thread ridotti da 4 a 3 (stessa velocita' misurata, meno calore).

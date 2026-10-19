@@ -29,14 +29,14 @@ object ModelDownloader {
         val total = option.totalBytes
         var done = 0L
         var lastReport = 0L
-        for ((name, size) in option.files) {
+        for ((name, size, remoteName) in option.files) {
             val target = File(dir, name)
             if (target.exists() && target.length() == size) {
                 done += size
                 continue
             }
             val part = File(dir, "$name.part")
-            downloadFile(URL(baseUrl + name), part, size) { read ->
+            downloadFile(URL(baseUrl + remoteName), part, size) { read ->
                 val now = SystemClock.elapsedRealtime()
                 if (now - lastReport > 150) {
                     lastReport = now

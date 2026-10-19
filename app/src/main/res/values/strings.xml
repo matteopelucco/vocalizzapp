@@ -50,6 +50,9 @@
     <string name="model_turbo_tagline">Capisce meglio parole e nomi, ma è più pesante e un po\' più lento.</string>
     <string name="model_turbo_note">Nei vocali molto lunghi può omettere la punteggiatura.</string>
 
+    <string name="model_parakeet_title">Rapido e preciso</string>
+    <string name="model_parakeet_tagline">Il più veloce: un vocale di 30 secondi in pochi secondi, con punteggiatura e poca batteria. Pesa 0,7 GB da scaricare.</string>
+
     <string name="meter_precision">Precisione</string>
     <string name="meter_speed">Velocità</string>
     <string name="badge_recommended">Consigliato</string>

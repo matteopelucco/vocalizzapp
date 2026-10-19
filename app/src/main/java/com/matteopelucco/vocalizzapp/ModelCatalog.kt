@@ -4,7 +4,13 @@ import androidx.annotation.StringRes
 import java.util.Locale
 
 /** Un file del modello con la sua dimensione esatta (serve a verificare che il download sia completo). */
-data class ModelFile(val name: String, val sizeBytes: Long)
+data class ModelFile(
+    /** Nome del file sul telefono. */
+    val name: String,
+    val sizeBytes: Long,
+    /** Nome nel repository, se diverso (Parakeet non usa il prefisso del modello). */
+    val remoteName: String = name,
+)
 
 /** Un modello Whisper che l'utente puo' scegliere di scaricare. */
 data class ModelOption(
@@ -37,6 +43,8 @@ object ModelCatalog {
         ModelFile("$id-tokens.txt", TOKENS_BYTES),
     )
 
+    private fun parakeetFile(local: String, bytes: Long) = ModelFile("parakeet-$local", bytes, remoteName = local)
+
     val options: List<ModelOption> = listOf(
         ModelOption(
             id = "base",
@@ -57,7 +65,6 @@ object ModelCatalog {
             precision = 3,
             speed = 3,
             minRamGb = 4,
-            recommended = true,
         ),
         ModelOption(
             id = "turbo",
@@ -69,6 +76,23 @@ object ModelCatalog {
             precision = 5,
             speed = 2,
             minRamGb = 8,
+        ),
+        ModelOption(
+            id = "parakeet",
+            title = R.string.model_parakeet_title,
+            tagline = R.string.model_parakeet_tagline,
+            repo = "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+            // L'encoder (il piu' grande) per ultimo: il modello risulta installato solo a download finito.
+            files = listOf(
+                parakeetFile("tokens.txt", 93_939L),
+                parakeetFile("decoder.int8.onnx", 11_845_275L),
+                parakeetFile("joiner.int8.onnx", 6_355_277L),
+                parakeetFile("encoder.int8.onnx", 652_184_281L),
+            ),
+            precision = 4,
+            speed = 4,
+            minRamGb = 6,
+            recommended = true,
         ),
     )
 

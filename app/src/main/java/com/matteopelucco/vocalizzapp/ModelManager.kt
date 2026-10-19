@@ -11,6 +11,8 @@ data class WhisperModel(
     val encoder: File,
     val decoder: File,
     val tokens: File,
+    /** Presente nei modelli transducer (Parakeet); assente in Whisper. */
+    val joiner: File? = null,
 )
 
 /** Risorse del telefono che contano per la scelta del modello. */
@@ -60,7 +62,9 @@ class ModelManager(private val context: Context) {
                     val prefix = encoder.name.substringBefore("-encoder")
                     val decoder = pick(files, "$prefix-decoder")
                     val tokens = files.firstOrNull { it.name == "$prefix-tokens.txt" }
-                    if (decoder != null && tokens != null) WhisperModel(prefix, encoder, decoder, tokens) else null
+                    val joiner = pick(files, "$prefix-joiner")
+                    val complete = decoder != null && tokens != null && (prefix != PARAKEET || joiner != null)
+                    if (complete) WhisperModel(prefix, encoder, decoder!!, tokens!!, joiner) else null
                 }
         }.distinctBy { it.name }.sortedBy { it.name }
     }
@@ -90,6 +94,7 @@ class ModelManager(private val context: Context) {
         files.firstOrNull { it.name == "$base.int8.onnx" } ?: files.firstOrNull { it.name == "$base.onnx" }
 
     private companion object {
+        const val PARAKEET = "parakeet"
         const val KEY_ACTIVE = "active_model"
     }
 }

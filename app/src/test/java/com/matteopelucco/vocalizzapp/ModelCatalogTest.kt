@@ -17,17 +17,17 @@ class ModelCatalogTest {
     @Test
     fun hasExactlyOneRecommendedModel() {
         assertEquals(1, ModelCatalog.options.count { it.recommended })
-        assertEquals("small", ModelCatalog.recommended.id)
+        assertEquals("parakeet", ModelCatalog.recommended.id)
     }
 
     @Test
-    fun everyModelHasTheThreeFilesSherpaNeeds() {
+    fun everyModelHasTheFilesSherpaNeeds() {
         ModelCatalog.options.forEach { option ->
             val names = option.files.map { it.name }.toSet()
-            assertEquals(
-                setOf("${option.id}-encoder.int8.onnx", "${option.id}-decoder.int8.onnx", "${option.id}-tokens.txt"),
-                names,
-            )
+            val expected = setOf("${option.id}-encoder.int8.onnx", "${option.id}-decoder.int8.onnx", "${option.id}-tokens.txt")
+            // Parakeet (transducer) ha in piu' il joiner.
+            val extra = if (option.id == "parakeet") setOf("parakeet-joiner.int8.onnx") else emptySet()
+            assertEquals(expected + extra, names)
             assertTrue(option.files.all { it.sizeBytes > 0 })
             assertTrue(option.precision in 1..5 && option.speed in 1..5)
         }
