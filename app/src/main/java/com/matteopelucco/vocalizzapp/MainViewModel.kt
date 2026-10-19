@@ -7,8 +7,10 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +49,9 @@ private const val RECENT_COUNT = 3
 
 /** Quanti testi si caricano alla volta nella cronologia completa. */
 private const val HISTORY_PAGE_SIZE = 10
+
+/** Scope del lavoro di trascrizione: sopravvive al ViewModel, cosi' il lavoro non si ferma uscendo dall'app. */
+private val workScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val modelManager = ModelManager(app)
@@ -101,10 +106,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // Lavori attivi (compreso uno annullato che sta finendo il blocco in corso): il servizio resta finche' > 0.
     private var activeJobs = 0
 
+    private var cleared = false
+
     override fun onCleared() {
-        // Un servizio ancora attivo viene fermato dal "finally" del lavoro; qui basta liberare il modello.
-        transcriber?.close()
-        transcriber = null
+        // La trascrizione in corso NON dipende dal ViewModel (gira in [workScope]): continua anche se
+        // l'utente chiude l'activity (es. "indietro" verso WhatsApp). Il modello si libera a lavoro finito.
+        cleared = true
+        releaseTranscriberIfIdle()
+    }
+
+    private fun releaseTranscriberIfIdle() {
+        if (cleared && activeJobs == 0) {
+            transcriber?.close()
+            transcriber = null
+        }
     }
 
     /** Il servizio in primo piano evita che Android rallenti la CPU se l'utente lascia l'app. */
@@ -115,6 +130,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun serviceFinished() {
         if (--activeJobs == 0) TranscriptionService.stop(getApplication())
+        releaseTranscriberIfIdle()
     }
 
     // --- Cronologia -----------------------------------------------------------------------------
@@ -292,7 +308,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _audio.value = readAudioInfo(getApplication(), uri)
         _history.value = HistoryUi() // un nuovo vocale ha la precedenza sulla cronologia aperta
         job?.cancel()
-        job = viewModelScope.launch {
+        job = workScope.launch {
             var started = false
             try {
                 val model = modelManager.findModel(modelName)
